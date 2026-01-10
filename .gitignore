@@ -6,7 +6,7 @@ dist/
 build/
 
 # Database
-data/*.db
+data/
 
 # Environment
 .env
