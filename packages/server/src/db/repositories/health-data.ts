@@ -21,9 +21,30 @@ export interface PaginatedResult<T> {
   };
 }
 
+export interface AggregateResult {
+  data_type: string;
+  min: number;
+  max: number;
+  avg: number;
+  count: number;
+}
+
+export interface TrendResult {
+  data_type: string;
+  trend: 'up' | 'down' | 'stable';
+  change_percent: number;
+  latest_value: number;
+  first_value: number;
+}
+
 interface QueryFilter {
   column: string;
   operator: string;
+  value: unknown;
+}
+
+interface FieldUpdate {
+  field: string;
   value: unknown;
 }
 
@@ -34,6 +55,16 @@ function buildWhereClause(filters: QueryFilter[]): { clause: string; params: unk
   const conditions = filters.map((f) => `${f.column} ${f.operator} ?`);
   const params = filters.map((f) => f.value);
   return { clause: `WHERE ${conditions.join(' AND ')}`, params };
+}
+
+function collectFieldUpdates(data: Record<string, unknown>, fields: string[]): FieldUpdate[] {
+  const updates: FieldUpdate[] = [];
+  for (const field of fields) {
+    if (data[field] !== undefined) {
+      updates.push({ field, value: data[field] });
+    }
+  }
+  return updates;
 }
 
 export const healthDataRepository = {
@@ -92,19 +123,10 @@ export const healthDataRepository = {
   update(id: number, data: Partial<HealthDataCreate>): HealthDataRecord | undefined {
     const db = getDatabase();
 
-    const fieldUpdates: Array<{ field: string; value: unknown }> = [];
-    if (data.data_type !== undefined) {
-      fieldUpdates.push({ field: 'data_type', value: data.data_type });
-    }
-    if (data.value !== undefined) {
-      fieldUpdates.push({ field: 'value', value: data.value });
-    }
-    if (data.unit !== undefined) {
-      fieldUpdates.push({ field: 'unit', value: data.unit });
-    }
-    if (data.recorded_at !== undefined) {
-      fieldUpdates.push({ field: 'recorded_at', value: data.recorded_at });
-    }
+    const fieldUpdates = collectFieldUpdates(
+      data as Record<string, unknown>,
+      ['data_type', 'value', 'unit', 'recorded_at']
+    );
 
     if (fieldUpdates.length === 0) {
       return this.findById(id);
@@ -123,5 +145,128 @@ export const healthDataRepository = {
     const stmt = db.prepare('DELETE FROM health_data WHERE id = ?');
     const result = stmt.run(id);
     return result.changes > 0;
+  },
+
+  getLatest(dataTypes: string[]): Record<string, HealthDataRecord> {
+    const db = getDatabase();
+    const result: Record<string, HealthDataRecord> = {};
+
+    if (dataTypes.length === 0) {
+      return result;
+    }
+
+    const placeholders = dataTypes.map(() => '?').join(', ');
+    const stmt = db.prepare(`
+      SELECT h1.*
+      FROM health_data h1
+      INNER JOIN (
+        SELECT data_type, MAX(recorded_at) as max_recorded_at
+        FROM health_data
+        WHERE data_type IN (${placeholders})
+        GROUP BY data_type
+      ) h2 ON h1.data_type = h2.data_type AND h1.recorded_at = h2.max_recorded_at
+    `);
+
+    const records = stmt.all(...dataTypes) as HealthDataRecord[];
+    for (const record of records) {
+      result[record.data_type] = record;
+    }
+
+    return result;
+  },
+
+  getRange(dataTypes: string[], startDate: string, endDate: string): HealthDataRecord[] {
+    const db = getDatabase();
+
+    if (dataTypes.length === 0) {
+      return [];
+    }
+
+    const placeholders = dataTypes.map(() => '?').join(', ');
+    const stmt = db.prepare(`
+      SELECT * FROM health_data
+      WHERE data_type IN (${placeholders})
+        AND recorded_at >= ?
+        AND recorded_at <= ?
+      ORDER BY recorded_at ASC
+    `);
+
+    return stmt.all(...dataTypes, startDate, endDate) as HealthDataRecord[];
+  },
+
+  aggregate(dataTypes: string[], startDate: string, endDate: string): AggregateResult[] {
+    const db = getDatabase();
+
+    if (dataTypes.length === 0) {
+      return [];
+    }
+
+    const placeholders = dataTypes.map(() => '?').join(', ');
+    const stmt = db.prepare(`
+      SELECT
+        data_type,
+        MIN(value) as min,
+        MAX(value) as max,
+        AVG(value) as avg,
+        COUNT(*) as count
+      FROM health_data
+      WHERE data_type IN (${placeholders})
+        AND recorded_at >= ?
+        AND recorded_at <= ?
+      GROUP BY data_type
+    `);
+
+    return stmt.all(...dataTypes, startDate, endDate) as AggregateResult[];
+  },
+
+  analyzeTrend(dataTypes: string[], startDate: string, endDate: string): TrendResult[] {
+    const db = getDatabase();
+    const results: TrendResult[] = [];
+
+    if (dataTypes.length === 0) {
+      return results;
+    }
+
+    for (const dataType of dataTypes) {
+      const stmt = db.prepare(`
+        SELECT value, recorded_at
+        FROM health_data
+        WHERE data_type = ?
+          AND recorded_at >= ?
+          AND recorded_at <= ?
+        ORDER BY recorded_at ASC
+      `);
+
+      const records = stmt.all(dataType, startDate, endDate) as Array<{ value: number; recorded_at: string }>;
+
+      if (records.length === 0) {
+        continue;
+      }
+
+      const firstValue = records[0].value;
+      const latestValue = records[records.length - 1].value;
+
+      let changePercent = 0;
+      if (firstValue !== 0) {
+        changePercent = ((latestValue - firstValue) / Math.abs(firstValue)) * 100;
+      }
+
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (changePercent > 5) {
+        trend = 'up';
+      } else if (changePercent < -5) {
+        trend = 'down';
+      }
+
+      results.push({
+        data_type: dataType,
+        trend,
+        change_percent: Math.round(changePercent * 10) / 10,
+        latest_value: latestValue,
+        first_value: firstValue,
+      });
+    }
+
+    return results;
   },
 };

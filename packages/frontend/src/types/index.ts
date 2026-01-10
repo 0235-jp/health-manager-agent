@@ -31,3 +31,32 @@ export interface ApiError {
     details?: unknown;
   };
 }
+
+export interface CustomInstruction {
+  id: number;
+  instruction: string;
+  priority: number;
+  is_active: number; // SQLite boolean (0 or 1)
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCustomInstructionInput {
+  instruction: string;
+  priority?: number;
+  is_active?: boolean;
+}
+
+export interface UpdateCustomInstructionInput {
+  instruction?: string;
+  priority?: number;
+  is_active?: boolean;
+}
+
+export interface TrendResult {
+  data_type: string;
+  trend: 'up' | 'down' | 'stable';
+  change_percent: number;
+  latest_value: number;
+  first_value: number;
+}

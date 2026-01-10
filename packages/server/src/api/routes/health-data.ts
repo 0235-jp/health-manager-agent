@@ -18,12 +18,50 @@ function parseId(req: Request): number {
   return parseInt(req.params.id, 10);
 }
 
+function parseDataTypes(param: unknown): string[] {
+  if (Array.isArray(param)) {
+    return param as string[];
+  }
+  if (param) {
+    return [param as string];
+  }
+  return [];
+}
+
 healthDataRouter.get(
   '/',
   validateQuery(healthDataQuerySchema),
   asyncHandler((req, res) => {
     const query = req.query as unknown as HealthDataQuery;
     const result = healthDataRepository.findAll(query);
+    res.json(result);
+  })
+);
+
+healthDataRouter.get(
+  '/latest',
+  asyncHandler((req, res) => {
+    const dataTypes = parseDataTypes(req.query.data_types);
+    const result = healthDataRepository.getLatest(dataTypes);
+    res.json(result);
+  })
+);
+
+healthDataRouter.get(
+  '/trend',
+  asyncHandler((req, res) => {
+    const dataTypes = parseDataTypes(req.query.data_types);
+    const days = parseInt(req.query.days as string, 10) || 7;
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const result = healthDataRepository.analyzeTrend(
+      dataTypes,
+      startDate.toISOString(),
+      endDate.toISOString()
+    );
     res.json(result);
   })
 );

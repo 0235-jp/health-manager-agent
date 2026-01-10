@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 export const healthDataQuerySchema = z.object({
   data_type: z.string().optional(),
@@ -16,8 +16,18 @@ export const healthDataCreateSchema = z.object({
   recorded_at: z.string().datetime(),
 });
 
-export const settingsUpdateSchema = z.record(z.unknown());
+export const settingsUpdateSchema = z.record(z.string(), z.unknown());
+
+export const customInstructionCreateSchema = z.object({
+  instruction: z.string().min(1).max(500),
+  priority: z.number().int().min(0).max(100).default(0),
+  is_active: z.boolean().default(true),
+});
+
+export const customInstructionUpdateSchema = customInstructionCreateSchema.partial();
 
 export type HealthDataQuery = z.infer<typeof healthDataQuerySchema>;
 export type HealthDataCreate = z.infer<typeof healthDataCreateSchema>;
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
+export type CustomInstructionCreate = z.infer<typeof customInstructionCreateSchema>;
+export type CustomInstructionUpdate = z.infer<typeof customInstructionUpdateSchema>;

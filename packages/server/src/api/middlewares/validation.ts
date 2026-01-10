@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
-import { ZodSchema, ZodError } from 'zod';
+import type { ZodSchema } from 'zod/v4';
 
 type RequestTarget = 'query' | 'body';
 
@@ -11,7 +11,7 @@ function createValidator(schema: ZodSchema, target: RequestTarget): RequestHandl
       res.status(400).json({
         error: {
           message: 'Validation error',
-          details: result.error.errors,
+          details: result.error.issues,
         },
       });
       return;

@@ -1,4 +1,12 @@
-import type { HealthData, PaginatedResponse, Settings } from '../types';
+import type {
+  HealthData,
+  PaginatedResponse,
+  Settings,
+  CustomInstruction,
+  CreateCustomInstructionInput,
+  UpdateCustomInstructionInput,
+  TrendResult,
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -81,6 +89,16 @@ export const api = {
     delete(id: number): Promise<void> {
       return fetchJson(`/health-data/${id}`, { method: 'DELETE' });
     },
+
+    getLatest(dataTypes: string[]): Promise<Record<string, HealthData>> {
+      const params = dataTypes.map((t) => `data_types=${encodeURIComponent(t)}`).join('&');
+      return fetchJson(`/health-data/latest?${params}`);
+    },
+
+    getTrend(dataTypes: string[], days: number = 7): Promise<TrendResult[]> {
+      const dataTypesParam = dataTypes.map((t) => `data_types=${encodeURIComponent(t)}`).join('&');
+      return fetchJson(`/health-data/trend?${dataTypesParam}&days=${days}`);
+    },
   },
 
   settings: {
@@ -93,6 +111,38 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(settings),
       });
+    },
+  },
+
+  customInstructions: {
+    list(): Promise<{ data: CustomInstruction[] }> {
+      return fetchJson('/custom-instructions');
+    },
+
+    get(id: number): Promise<CustomInstruction> {
+      return fetchJson(`/custom-instructions/${id}`);
+    },
+
+    create(data: CreateCustomInstructionInput): Promise<CustomInstruction> {
+      return fetchJson('/custom-instructions', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    update(id: number, data: UpdateCustomInstructionInput): Promise<CustomInstruction> {
+      return fetchJson(`/custom-instructions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+
+    delete(id: number): Promise<void> {
+      return fetchJson(`/custom-instructions/${id}`, { method: 'DELETE' });
+    },
+
+    toggle(id: number): Promise<CustomInstruction> {
+      return fetchJson(`/custom-instructions/${id}/toggle`, { method: 'PATCH' });
     },
   },
 };
