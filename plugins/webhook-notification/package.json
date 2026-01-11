@@ -1,0 +1,16 @@
+{
+  "name": "@health-manager/webhook-notification",
+  "version": "1.0.0",
+  "description": "Webhook Notification Plugin for Health Manager",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:zip": "npm run build && node scripts/create-zip.js",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "adm-zip": "^0.5.16"
+  }
+}

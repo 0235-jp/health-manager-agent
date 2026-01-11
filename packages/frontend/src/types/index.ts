@@ -87,3 +87,75 @@ export interface GenerateReportInput {
   report_type: 'on_fetch' | 'daily';
   target_date?: string;
 }
+
+// Plugin types
+export type PluginType = 'data-source' | 'agent' | 'notification';
+
+export interface ConfigField {
+  type: 'string' | 'number' | 'boolean' | 'select';
+  label: string;
+  description?: string;
+  required?: boolean;
+  secret?: boolean;
+  options?: { value: string; label: string }[];
+  default?: unknown;
+}
+
+export interface DataTypeDefinition {
+  name: string;
+  displayName: string;
+  category: string;
+  unit: string;
+  description?: string;
+}
+
+export interface Plugin {
+  name: string;
+  displayName: string;
+  version: string;
+  type: PluginType;
+  description?: string;
+  isActive: boolean;
+  isLoaded: boolean;
+  config: Record<string, unknown>;
+  configSchema?: Record<string, ConfigField>;
+  supportedDataTypes?: DataTypeDefinition[];
+  supportedModels?: string[];
+  capabilities?: string[];
+  installedAt?: string;
+  updatedAt?: string;
+}
+
+export interface CurrentAgent {
+  name: string;
+  displayName: string;
+  version: string;
+  supportedModels: string[];
+  capabilities: string[];
+}
+
+export interface PluginTestResult {
+  success: boolean;
+  message?: string;
+}
+
+export interface PluginInstallResult {
+  success: boolean;
+  plugin: {
+    name: string;
+    displayName: string;
+    version: string;
+    type: PluginType;
+  };
+}
+
+export interface FetchResult {
+  success: boolean;
+  data: Array<{
+    dataType: string;
+    value: number;
+    unit: string;
+    recordedAt: string;
+  }>;
+  errors?: string[];
+}

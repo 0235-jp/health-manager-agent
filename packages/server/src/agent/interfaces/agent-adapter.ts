@@ -1,5 +1,4 @@
 import type { HealthDataRecord } from '../../db/repositories/health-data.js';
-import type { CustomInstructionRecord } from '../../db/repositories/custom-instructions.js';
 
 export interface AgentAdapter {
   readonly name: string;
@@ -16,7 +15,10 @@ export interface GenerateReportParams {
   periodStart: Date;
   periodEnd: Date;
   healthData?: HealthDataRecord[];
-  customInstructions?: CustomInstructionRecord[];
+  customInstructions?: Array<{
+    instruction: string;
+    priority: number;
+  }>;
 }
 
 export interface MetricValue {

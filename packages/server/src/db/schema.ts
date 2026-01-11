@@ -64,6 +64,7 @@ export function initializeSchema(): void {
       name TEXT NOT NULL UNIQUE,
       display_name TEXT NOT NULL,
       version TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'notification',
       description TEXT,
       supported_data_types TEXT,
       config TEXT,
@@ -72,6 +73,13 @@ export function initializeSchema(): void {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration: Add type column to plugins table if it doesn't exist
+  const pluginsColumns = db.prepare("PRAGMA table_info(plugins)").all() as { name: string }[];
+  const hasTypeColumn = pluginsColumns.some(col => col.name === 'type');
+  if (!hasTypeColumn) {
+    db.exec("ALTER TABLE plugins ADD COLUMN type TEXT NOT NULL DEFAULT 'notification'");
+  }
 
   // custom_data_types table
   db.exec(`

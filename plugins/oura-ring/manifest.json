@@ -1,0 +1,34 @@
+{
+  "name": "oura-ring",
+  "displayName": "Oura Ring",
+  "version": "1.0.0",
+  "type": "data-source",
+  "description": "Oura Ring API v2からヘルスデータを取得",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "supportedDataTypes": [
+    { "name": "sleep_duration", "displayName": "睡眠時間", "category": "睡眠", "unit": "hours" },
+    { "name": "deep_sleep", "displayName": "深い睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "rem_sleep", "displayName": "レム睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "sleep_quality", "displayName": "睡眠スコア", "category": "睡眠", "unit": "score" },
+    { "name": "steps", "displayName": "歩数", "category": "活動", "unit": "count" },
+    { "name": "calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "heart_rate", "displayName": "心拍数", "category": "心臓", "unit": "bpm" },
+    { "name": "oura:readiness_score", "displayName": "レディネススコア", "category": "活動", "unit": "score" },
+    { "name": "oura:activity_score", "displayName": "活動スコア", "category": "活動", "unit": "score" },
+    { "name": "oura:spo2", "displayName": "血中酸素", "category": "心臓", "unit": "%" },
+    { "name": "oura:stress_level", "displayName": "ストレスレベル", "category": "精神", "unit": "score" },
+    { "name": "oura:temperature_deviation", "displayName": "体温偏差", "category": "体温", "unit": "°C" }
+  ],
+  "fetchStrategy": "both",
+  "defaultFetchInterval": 60,
+  "configSchema": {
+    "accessToken": {
+      "type": "string",
+      "label": "Personal Access Token",
+      "description": "Oura Cloudで生成したアクセストークン（https://cloud.ouraring.com/personal-access-tokens）",
+      "required": true,
+      "secret": true
+    }
+  }
+}

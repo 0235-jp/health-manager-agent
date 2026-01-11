@@ -1,0 +1,36 @@
+{
+  "name": "webhook-notification",
+  "displayName": "Webhook通知",
+  "version": "1.0.0",
+  "type": "notification",
+  "description": "Webhookを使用してレポートやアラートを外部サービスに通知",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "supportedEvents": [
+    "report:generated",
+    "report:daily",
+    "health:alert",
+    "data:fetched"
+  ],
+  "deliveryMethod": "push",
+  "configSchema": {
+    "webhookUrl": {
+      "type": "string",
+      "label": "Webhook URL",
+      "description": "通知を送信するWebhook URL",
+      "required": true
+    },
+    "enabledEvents": {
+      "type": "string",
+      "label": "有効なイベント",
+      "description": "通知するイベント（カンマ区切り）",
+      "default": "report:daily,health:alert"
+    },
+    "includeFullReport": {
+      "type": "boolean",
+      "label": "フルレポートを含める",
+      "description": "レポート全文を通知に含める",
+      "default": true
+    }
+  }
+}

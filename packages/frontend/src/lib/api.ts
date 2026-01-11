@@ -8,6 +8,12 @@ import type {
   TrendResult,
   Report,
   GenerateReportInput,
+  Plugin,
+  PluginType,
+  CurrentAgent,
+  PluginTestResult,
+  PluginInstallResult,
+  FetchResult,
 } from '../types';
 
 const API_BASE = '/api';
@@ -171,6 +177,84 @@ export const api = {
 
     delete(id: number): Promise<void> {
       return fetchJson(`/reports/${id}`, { method: 'DELETE' });
+    },
+  },
+
+  plugins: {
+    list(type?: PluginType): Promise<Plugin[]> {
+      const query = type ? `?type=${type}` : '';
+      return fetchJson(`/plugins${query}`);
+    },
+
+    get(name: string): Promise<Plugin> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}`);
+    },
+
+    updateConfig(name: string, config: Record<string, unknown>): Promise<{ success: boolean }> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}/config`, {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      });
+    },
+
+    setActive(name: string, isActive: boolean): Promise<{ success: boolean; isActive: boolean }> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}/active`, {
+        method: 'PUT',
+        body: JSON.stringify({ isActive }),
+      });
+    },
+
+    test(name: string): Promise<PluginTestResult> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}/test`, {
+        method: 'POST',
+      });
+    },
+
+    async install(file: File): Promise<PluginInstallResult> {
+      const formData = new FormData();
+      formData.append('plugin', file);
+
+      const response = await fetch(`${API_BASE}/plugins/install`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Plugin install failed');
+      }
+
+      return response.json();
+    },
+
+    uninstall(name: string): Promise<{ success: boolean }> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    load(name: string): Promise<{ success: boolean; plugin: Plugin }> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}/load`, {
+        method: 'POST',
+      });
+    },
+
+    fetch(name: string, params: { startDate?: string; endDate?: string; dataTypes?: string[] }): Promise<FetchResult> {
+      return fetchJson(`/plugins/${encodeURIComponent(name)}/fetch`, {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+    },
+
+    getCurrentAgent(): Promise<CurrentAgent | null> {
+      return fetchJson('/plugins/agent/current');
+    },
+
+    setCurrentAgent(name: string): Promise<{ success: boolean; currentAgent: string }> {
+      return fetchJson('/plugins/agent/current', {
+        method: 'PUT',
+        body: JSON.stringify({ name }),
+      });
     },
   },
 };

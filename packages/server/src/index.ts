@@ -3,14 +3,22 @@ import { config } from './config/index.js';
 import { initializeSchema } from './db/schema.js';
 import { seedInitialData } from './db/seed.js';
 import { AgentService } from './agent/index.js';
+import { PluginManager } from './plugins/manager.js';
 import { getScheduler } from './scheduler/index.js';
+import path from 'path';
 
 async function main(): Promise<void> {
   // Initialize database
   initializeSchema();
   seedInitialData();
 
-  // Initialize agent service
+  // Initialize plugin manager
+  const pluginsDir = path.resolve(process.cwd(), 'data', 'plugins');
+  const pluginManager = PluginManager.getInstance(pluginsDir);
+  await pluginManager.initialize();
+  console.log('Plugin manager initialized');
+
+  // Initialize agent service (now delegates to PluginManager)
   const agentService = AgentService.getInstance();
   await agentService.initialize();
   console.log('Agent service initialized');
@@ -33,6 +41,7 @@ async function main(): Promise<void> {
 
     await scheduler.stop();
     await agentService.dispose();
+    await pluginManager.dispose();
 
     server.close(() => {
       console.log('Server closed');

@@ -1,0 +1,100 @@
+/**
+ * DataSourcePlugin - データ収集プラグイン
+ */
+
+import type { BasePlugin, PluginManifest } from './base.js';
+
+/**
+ * データタイプ定義
+ */
+export interface DataTypeDefinition {
+  name: string; // 識別子（標準タイプまたは plugin_name:custom_type）
+  displayName: string;
+  category: string; // 身体, 心臓, 睡眠, 活動, 体温, 精神
+  unit: string;
+  description?: string;
+}
+
+/**
+ * DataSourceプラグインのマニフェスト
+ */
+export interface DataSourceManifest extends PluginManifest {
+  type: 'data-source';
+  supportedDataTypes: DataTypeDefinition[];
+  fetchStrategy: 'manual' | 'scheduled' | 'both';
+  defaultFetchInterval?: number; // 分単位
+}
+
+/**
+ * データ取得オプション
+ */
+export interface FetchOptions {
+  startDate?: Date;
+  endDate?: Date;
+  dataTypes?: string[];
+}
+
+/**
+ * ヘルスデータ入力
+ */
+export interface HealthDataInput {
+  dataType: string;
+  value: number;
+  unit: string;
+  recordedAt: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * データ取得結果
+ */
+export interface FetchResult {
+  success: boolean;
+  data: HealthDataInput[];
+  errors?: string[];
+  nextFetchAt?: Date;
+}
+
+/**
+ * 接続テスト結果
+ */
+export interface ConnectionTestResult {
+  success: boolean;
+  message?: string;
+}
+
+/**
+ * DataSourceプラグインインターフェース
+ */
+export interface DataSourcePlugin extends BasePlugin {
+  readonly manifest: DataSourceManifest;
+
+  /**
+   * データを取得
+   * @param options 取得オプション
+   */
+  fetchData(options: FetchOptions): Promise<FetchResult>;
+
+  /**
+   * 接続テスト
+   */
+  testConnection(): Promise<ConnectionTestResult>;
+
+  /**
+   * OAuth認証URL取得（OAuth対応プラグイン用）
+   */
+  getAuthorizationUrl?(): Promise<string>;
+
+  /**
+   * OAuthコールバック処理
+   * @param code 認証コード
+   */
+  handleOAuthCallback?(code: string): Promise<void>;
+}
+
+/**
+ * DataSourceプラグインかどうかを判定
+ */
+export function isDataSourcePlugin(plugin: BasePlugin): plugin is DataSourcePlugin {
+  return plugin.manifest.type === 'data-source';
+}

@@ -1,8 +1,13 @@
-import type { CustomInstructionRecord } from '../db/repositories/custom-instructions.js';
+// 簡略化されたカスタム指示型（プラグインシステムと互換）
+interface CustomInstruction {
+  instruction: string;
+  priority: number;
+  is_active?: number; // オプション（レポジトリから取得時のみ）
+}
 
 export interface BuildSystemPromptParams {
   reportType: 'on_fetch' | 'daily';
-  customInstructions: CustomInstructionRecord[];
+  customInstructions: CustomInstruction[];
   serverBaseUrl: string;
 }
 
@@ -35,8 +40,9 @@ SERVER_BASE_URL: ${serverBaseUrl}
 }
 `;
 
+  // is_activeがある場合（リポジトリから取得時）はフィルタリング、なければ全てアクティブとみなす
   const activeInstructions = customInstructions
-    .filter((inst) => inst.is_active === 1)
+    .filter((inst) => inst.is_active === undefined || inst.is_active === 1)
     .sort((a, b) => b.priority - a.priority);
 
   if (activeInstructions.length > 0) {

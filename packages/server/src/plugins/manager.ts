@@ -1,0 +1,442 @@
+/**
+ * PluginManager - プラグインシステムのオーケストレーター
+ */
+
+import * as path from 'path';
+import { PluginLoader, type LoadedPlugin } from './loader.js';
+import { PluginRegistry, type PluginState } from './registry.js';
+import { EventBus } from './event-bus.js';
+import type {
+  AgentPlugin,
+  FetchOptions,
+  HealthDataInput,
+  NotificationEvent,
+  NotificationPlugin,
+  PluginType,
+} from './interfaces/index.js';
+
+/**
+ * プラグインマネージャー
+ * プラグインシステム全体の統括を担当
+ */
+export class PluginManager {
+  private static instance: PluginManager | null = null;
+
+  private loader: PluginLoader;
+  private registry: PluginRegistry;
+  private eventBus: EventBus;
+  private currentAgentName: string | null = null;
+  private initialized = false;
+  private pluginConfigStore: Map<string, Record<string, unknown>> = new Map();
+  private pluginUnsubscribers: Map<string, () => void> = new Map();
+
+  private constructor(pluginsDir: string) {
+    this.loader = new PluginLoader(pluginsDir);
+    this.registry = new PluginRegistry();
+    this.eventBus = new EventBus();
+  }
+
+  /**
+   * シングルトンインスタンスを取得
+   * @param pluginsDir プラグインディレクトリ（初回のみ必要）
+   */
+  static getInstance(pluginsDir?: string): PluginManager {
+    if (!PluginManager.instance) {
+      if (!pluginsDir) {
+        // デフォルトのプラグインディレクトリ
+        pluginsDir = path.resolve(process.cwd(), 'data', 'plugins');
+      }
+      PluginManager.instance = new PluginManager(pluginsDir);
+    }
+    return PluginManager.instance;
+  }
+
+  /**
+   * テスト用: インスタンスをリセット
+   */
+  static resetInstance(): void {
+    if (PluginManager.instance) {
+      PluginManager.instance.eventBus.clear();
+      PluginManager.instance.registry.clear();
+    }
+    PluginManager.instance = null;
+  }
+
+  /**
+   * プラグインマネージャーを初期化
+   * サーバー起動時に呼び出す
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    console.log('[PluginManager] Initializing...');
+
+    // プラグインは自動ロードしない（WebUIからインポート）
+    // ここでは初期化のみ
+
+    this.initialized = true;
+    console.log('[PluginManager] Initialized (no plugins auto-loaded)');
+  }
+
+  /**
+   * ZIPからプラグインをインストール
+   * @param zipPath ZIPファイルのパス
+   * @returns インストールされたプラグイン情報
+   */
+  async installPlugin(zipPath: string): Promise<PluginState> {
+    console.log(`[PluginManager] Installing plugin from ${zipPath}...`);
+
+    const loadedPlugin = await this.loader.installFromZip(zipPath);
+    return await this.registerAndInitializePlugin(loadedPlugin);
+  }
+
+  /**
+   * プラグインディレクトリから直接ロード（開発用）
+   * @param pluginPath プラグインディレクトリのパス
+   */
+  async loadPluginFromPath(pluginPath: string): Promise<PluginState> {
+    console.log(`[PluginManager] Loading plugin from ${pluginPath}...`);
+
+    const loadedPlugin = await this.loader.loadPlugin(pluginPath);
+    return await this.registerAndInitializePlugin(loadedPlugin);
+  }
+
+  /**
+   * プラグインをアンインストール
+   * @param pluginName プラグイン名
+   */
+  async uninstallPlugin(pluginName: string): Promise<void> {
+    console.log(`[PluginManager] Uninstalling plugin: ${pluginName}...`);
+
+    const state = this.registry.get(pluginName);
+    if (!state) {
+      throw new Error(`Plugin "${pluginName}" is not installed`);
+    }
+
+    // プラグインをdispose
+    try {
+      await state.plugin.dispose();
+    } catch (error) {
+      console.error(`[PluginManager] Error disposing plugin ${pluginName}:`, error);
+    }
+
+    // 現在のエージェントだった場合はクリア
+    if (this.currentAgentName === pluginName) {
+      this.currentAgentName = null;
+    }
+
+    // EventBusの購読を解除
+    const unsubscribe = this.pluginUnsubscribers.get(pluginName);
+    if (unsubscribe) {
+      unsubscribe();
+      this.pluginUnsubscribers.delete(pluginName);
+    }
+
+    // レジストリから削除
+    this.registry.unregister(pluginName);
+
+    // ファイルを削除
+    await this.loader.uninstall(pluginName);
+
+    // 保存された設定を削除
+    this.pluginConfigStore.delete(pluginName);
+
+    console.log(`[PluginManager] Plugin ${pluginName} uninstalled`);
+  }
+
+  /**
+   * プラグインを登録して初期化
+   */
+  private async registerAndInitializePlugin(
+    loadedPlugin: LoadedPlugin
+  ): Promise<PluginState> {
+    const { manifest, instance } = loadedPlugin;
+
+    // 既存のプラグインがあれば先にdispose
+    const existing = this.registry.get(manifest.name);
+    if (existing) {
+      try {
+        await existing.plugin.dispose();
+      } catch (error) {
+        console.error(`[PluginManager] Error disposing existing plugin:`, error);
+      }
+      this.registry.unregister(manifest.name);
+    }
+
+    // 保存された設定を復元
+    const savedConfig = this.pluginConfigStore.get(manifest.name) || {};
+
+    // レジストリに登録
+    this.registry.register(instance, savedConfig, true);
+
+    // プラグインを初期化
+    try {
+      await instance.initialize(savedConfig);
+      console.log(`[PluginManager] Plugin ${manifest.name} initialized`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.registry.setError(manifest.name, errorMsg);
+      console.error(`[PluginManager] Failed to initialize ${manifest.name}:`, error);
+    }
+
+    // 通知プラグインの場合、EventBusに登録
+    if (manifest.type === 'notification') {
+      this.registerNotificationPlugin(instance as NotificationPlugin);
+    }
+
+    // Agentプラグインで現在のエージェントが未設定なら設定
+    if (manifest.type === 'agent' && !this.currentAgentName) {
+      this.currentAgentName = manifest.name;
+    }
+
+    return this.registry.get(manifest.name)!;
+  }
+
+  /**
+   * 通知プラグインをEventBusに登録
+   */
+  private registerNotificationPlugin(plugin: NotificationPlugin): void {
+    const supportedEvents = plugin.manifest.supportedEvents;
+    const pluginName = plugin.manifest.name;
+
+    // 既存の購読があれば解除
+    const existingUnsubscribe = this.pluginUnsubscribers.get(pluginName);
+    if (existingUnsubscribe) {
+      existingUnsubscribe();
+    }
+
+    const unsubscribe = this.eventBus.subscribeMany(supportedEvents, async (event) => {
+      const state = this.registry.get(pluginName);
+      if (!state?.isActive) return;
+
+      try {
+        await plugin.notify(event);
+      } catch (error) {
+        console.error(
+          `[PluginManager] Notification plugin ${pluginName} failed:`,
+          error
+        );
+      }
+    });
+
+    // unsubscribe関数を保存
+    this.pluginUnsubscribers.set(pluginName, unsubscribe);
+  }
+
+  // ========== プラグイン一覧・取得 ==========
+
+  /**
+   * プラグイン一覧を取得
+   * @param type プラグインタイプでフィルタ（オプション）
+   */
+  getPlugins(type?: PluginType): PluginState[] {
+    if (type) {
+      return this.registry.getByType(type);
+    }
+    return this.registry.all();
+  }
+
+  /**
+   * プラグインを取得
+   * @param name プラグイン名
+   */
+  getPlugin(name: string): PluginState | undefined {
+    return this.registry.get(name);
+  }
+
+  // ========== エージェント管理 ==========
+
+  /**
+   * 現在のAgentPluginを取得
+   */
+  getCurrentAgent(): AgentPlugin | null {
+    if (!this.currentAgentName) {
+      return null;
+    }
+
+    const agents = this.registry.getAgentPlugins();
+    return agents.find((a) => a.manifest.name === this.currentAgentName) || null;
+  }
+
+  /**
+   * 現在のエージェント名を取得
+   */
+  getCurrentAgentName(): string | null {
+    return this.currentAgentName;
+  }
+
+  /**
+   * エージェントを切り替え
+   * @param pluginName プラグイン名
+   */
+  async setCurrentAgent(pluginName: string): Promise<void> {
+    const state = this.registry.get(pluginName);
+
+    if (!state) {
+      throw new Error(`Plugin "${pluginName}" is not installed`);
+    }
+
+    if (state.manifest.type !== 'agent') {
+      throw new Error(`Plugin "${pluginName}" is not an agent plugin`);
+    }
+
+    this.currentAgentName = pluginName;
+    console.log(`[PluginManager] Current agent set to: ${pluginName}`);
+  }
+
+  // ========== 設定管理 ==========
+
+  /**
+   * プラグイン設定を更新
+   * @param name プラグイン名
+   * @param config 新しい設定
+   */
+  async updatePluginConfig(
+    name: string,
+    config: Record<string, unknown>
+  ): Promise<void> {
+    const state = this.registry.get(name);
+    if (!state) {
+      throw new Error(`Plugin "${name}" is not installed`);
+    }
+
+    // 設定を更新（registry.updateConfigがstate.configをマージする）
+    this.registry.updateConfig(name, config);
+
+    // 更新後の設定を保存（state.configは参照なので既に更新済み）
+    this.pluginConfigStore.set(name, state.config);
+
+    // プラグインを再初期化
+    try {
+      await state.plugin.dispose();
+      await state.plugin.initialize(state.config);
+      this.registry.setError(name, undefined);
+      console.log(`[PluginManager] Plugin ${name} reconfigured`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.registry.setError(name, errorMsg);
+      throw error;
+    }
+  }
+
+  /**
+   * プラグインの有効/無効を切り替え
+   * @param name プラグイン名
+   * @param isActive 有効/無効
+   */
+  async setPluginActive(name: string, isActive: boolean): Promise<void> {
+    const state = this.registry.get(name);
+    if (!state) {
+      throw new Error(`Plugin "${name}" is not installed`);
+    }
+
+    this.registry.setActive(name, isActive);
+    console.log(`[PluginManager] Plugin ${name} ${isActive ? 'activated' : 'deactivated'}`);
+  }
+
+  // ========== イベント発行 ==========
+
+  /**
+   * イベントを発行
+   * @param event 通知イベント
+   */
+  async publishEvent(event: NotificationEvent): Promise<void> {
+    await this.eventBus.publish(event);
+  }
+
+  // ========== DataSource実行 ==========
+
+  /**
+   * DataSourceプラグインを実行してデータを取得
+   * @param options 取得オプション
+   */
+  async executeDataSourcePlugins(
+    options: FetchOptions
+  ): Promise<HealthDataInput[]> {
+    const results: HealthDataInput[] = [];
+    const plugins = this.registry.getDataSourcePlugins();
+
+    for (const plugin of plugins) {
+      try {
+        const result = await plugin.fetchData(options);
+        if (result.success) {
+          results.push(...result.data);
+        } else {
+          console.error(
+            `[PluginManager] DataSource ${plugin.manifest.name} failed:`,
+            result.errors
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[PluginManager] DataSource ${plugin.manifest.name} error:`,
+          error
+        );
+      }
+    }
+
+    return this.resolveConflicts(results);
+  }
+
+  /**
+   * 重複データの競合を解決
+   * 同じタイムスタンプ・データタイプの場合、最初のデータを採用
+   */
+  private resolveConflicts(data: HealthDataInput[]): HealthDataInput[] {
+    const seen = new Map<string, HealthDataInput>();
+
+    for (const item of data) {
+      const key = `${item.dataType}_${item.recordedAt.toISOString()}`;
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      }
+    }
+
+    return Array.from(seen.values());
+  }
+
+  // ========== クリーンアップ ==========
+
+  /**
+   * すべてのプラグインをdispose
+   */
+  async dispose(): Promise<void> {
+    console.log('[PluginManager] Disposing all plugins...');
+
+    const plugins = this.registry.all();
+
+    for (const state of plugins) {
+      try {
+        await state.plugin.dispose();
+      } catch (error) {
+        console.error(
+          `[PluginManager] Error disposing ${state.manifest.name}:`,
+          error
+        );
+      }
+    }
+
+    this.eventBus.clear();
+    this.registry.clear();
+    this.pluginUnsubscribers.clear();
+    this.initialized = false;
+
+    console.log('[PluginManager] All plugins disposed');
+  }
+
+  /**
+   * EventBusを取得（テスト用）
+   */
+  getEventBus(): EventBus {
+    return this.eventBus;
+  }
+
+  /**
+   * ローダーを取得（テスト用）
+   */
+  getLoader(): PluginLoader {
+    return this.loader;
+  }
+}
