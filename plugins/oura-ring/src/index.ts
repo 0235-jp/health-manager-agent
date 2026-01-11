@@ -16,6 +16,14 @@ import {
   mapHeartRate,
   mapDailySpO2,
   mapDailyStress,
+  mapVO2Max,
+  mapDailyCardiovascularAge,
+  mapDailyResilience,
+  mapWorkouts,
+  mapSessions,
+  mapSleepTime,
+  mapEnhancedTags,
+  mapRestModePeriods,
   type HealthDataInput,
 } from './data-mapper.js';
 
@@ -127,7 +135,7 @@ class OuraRingPlugin implements DataSourcePlugin {
     // 各エンドポイントからデータを取得
     try {
       // Daily Sleep & Sleep Periods
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['sleep_duration', 'deep_sleep', 'rem_sleep', 'sleep_quality'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['sleep_duration', 'deep_sleep', 'rem_sleep', 'oura:sleep_score'])) {
         const [dailySleep, sleepPeriods] = await Promise.all([
           this.client.getDailySleep(startDate, endDate),
           this.client.getSleepPeriods(startDate, endDate),
@@ -141,7 +149,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Daily Activity
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['steps', 'calories_burned', 'oura:activity_score', 'oura:active_calories'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['steps', 'oura:calories_burned', 'oura:activity_score', 'oura:active_calories'])) {
         const activity = await this.client.getDailyActivity(startDate, endDate);
         allData.push(...mapDailyActivity(activity));
       }
@@ -151,7 +159,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Daily Readiness
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:readiness_score', 'oura:temperature_deviation'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:readiness_score', 'temperature_deviation'])) {
         const readiness = await this.client.getDailyReadiness(startDate, endDate);
         allData.push(...mapDailyReadiness(readiness));
       }
@@ -172,7 +180,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Daily SpO2
-      if (!requestedTypes || requestedTypes.has('oura:spo2')) {
+      if (!requestedTypes || requestedTypes.has('spo2')) {
         const spo2 = await this.client.getDailySpO2(startDate, endDate);
         allData.push(...mapDailySpO2(spo2));
       }
@@ -188,6 +196,86 @@ class OuraRingPlugin implements DataSourcePlugin {
       }
     } catch (error) {
       errors.push(`Stress data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // VO2 Max
+      if (!requestedTypes || requestedTypes.has('vo2_max')) {
+        const vo2max = await this.client.getVO2Max(startDate, endDate);
+        allData.push(...mapVO2Max(vo2max));
+      }
+    } catch (error) {
+      errors.push(`VO2 Max data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Daily Cardiovascular Age
+      if (!requestedTypes || requestedTypes.has('cardiovascular_age')) {
+        const cardiovascular = await this.client.getDailyCardiovascularAge(startDate, endDate);
+        allData.push(...mapDailyCardiovascularAge(cardiovascular));
+      }
+    } catch (error) {
+      errors.push(`Cardiovascular age data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Daily Resilience
+      if (!requestedTypes || requestedTypes.has('oura:resilience')) {
+        const resilience = await this.client.getDailyResilience(startDate, endDate);
+        allData.push(...mapDailyResilience(resilience));
+      }
+    } catch (error) {
+      errors.push(`Resilience data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Workouts
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['workout_duration', 'workout_calories', 'oura:workout_distance'])) {
+        const workouts = await this.client.getWorkouts(startDate, endDate);
+        allData.push(...mapWorkouts(workouts));
+      }
+    } catch (error) {
+      errors.push(`Workout data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Sessions
+      if (!requestedTypes || requestedTypes.has('session_duration')) {
+        const sessions = await this.client.getSessions(startDate, endDate);
+        allData.push(...mapSessions(sessions));
+      }
+    } catch (error) {
+      errors.push(`Session data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Sleep Time
+      if (!requestedTypes || requestedTypes.has('oura:recommended_bedtime')) {
+        const sleepTime = await this.client.getSleepTime(startDate, endDate);
+        allData.push(...mapSleepTime(sleepTime));
+      }
+    } catch (error) {
+      errors.push(`Sleep time data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Enhanced Tags
+      if (!requestedTypes || requestedTypes.has('oura:tag')) {
+        const tags = await this.client.getEnhancedTags(startDate, endDate);
+        allData.push(...mapEnhancedTags(tags));
+      }
+    } catch (error) {
+      errors.push(`Enhanced tag data fetch failed: ${this.getErrorMessage(error)}`);
+    }
+
+    try {
+      // Rest Mode Periods
+      if (!requestedTypes || requestedTypes.has('oura:rest_mode_duration')) {
+        const restModes = await this.client.getRestModePeriods(startDate, endDate);
+        allData.push(...mapRestModePeriods(restModes));
+      }
+    } catch (error) {
+      errors.push(`Rest mode data fetch failed: ${this.getErrorMessage(error)}`);
     }
 
     // 重複を排除（同じdataType + recordedAt）

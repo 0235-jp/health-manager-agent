@@ -108,6 +108,119 @@ export interface DailyStressData {
   day_summary: string | null;
 }
 
+// VO2 Max Response
+export interface VO2MaxData {
+  id: string;
+  day: string;
+  timestamp: string;
+  vo2_max: number | null;
+}
+
+// Daily Cardiovascular Age Response
+export interface DailyCardiovascularAgeData {
+  id: string;
+  day: string;
+  vascular_age: number | null;
+}
+
+// Daily Resilience Response
+export interface DailyResilienceData {
+  id: string;
+  day: string;
+  level: string | null; // 'limited' | 'adequate' | 'solid' | 'strong' | 'exceptional'
+  contributors?: {
+    sleep_recovery: number;
+    daytime_recovery: number;
+    stress: number;
+  };
+}
+
+// Workout Response
+export interface WorkoutData {
+  id: string;
+  day: string;
+  activity: string;
+  calories: number | null;
+  distance: number | null; // meters
+  end_datetime: string;
+  start_datetime: string;
+  intensity: string | null; // 'easy' | 'moderate' | 'hard'
+  source: string;
+  label: string | null;
+}
+
+// Session Response
+export interface SessionData {
+  id: string;
+  day: string;
+  start_datetime: string;
+  end_datetime: string;
+  type: string; // 'breathing' | 'meditation' | 'nap' | 'relaxation' | 'rest' | 'body_status'
+  mood: string | null; // 'bad' | 'worse' | 'same' | 'good' | 'great'
+  heart_rate?: {
+    interval: number;
+    items: number[];
+    timestamp: string;
+  };
+  heart_rate_variability?: {
+    interval: number;
+    items: number[];
+    timestamp: string;
+  };
+  motion_count?: {
+    interval: number;
+    items: number[];
+    timestamp: string;
+  };
+}
+
+// Sleep Time Response
+export interface SleepTimeData {
+  id: string;
+  day: string;
+  optimal_bedtime?: {
+    day_tz: number;
+    end_offset: number;
+    start_offset: number;
+  };
+  recommendation: string | null; // 'improve_efficiency' | 'earlier_bedtime' | 'later_bedtime' | 'earlier_wake_up_time' | 'later_wake_up_time' | 'follow_optimal_bedtime'
+  status: string | null; // 'not_enough_nights' | 'not_enough_recent_nights' | 'bad_sleep_quality' | 'only_recommended_found' | 'optimal_found'
+}
+
+// Enhanced Tag Response
+export interface EnhancedTagData {
+  id: string;
+  day: string;
+  timestamp: string;
+  tag_type_code: string | null;
+  text: string | null;
+  comment: string | null;
+}
+
+// Rest Mode Period Response
+export interface RestModePeriodData {
+  id: string;
+  end_day: string | null;
+  end_time: string | null;
+  start_day: string;
+  start_time: string | null;
+  episodes?: Array<{
+    tags: string[];
+    timestamp: string;
+  }>;
+}
+
+// Ring Configuration Response
+export interface RingConfigurationData {
+  id: string;
+  color: string | null;
+  design: string | null;
+  firmware_version: string | null;
+  hardware_type: string | null;
+  set_up_at: string | null;
+  size: number | null;
+}
+
 /**
  * Oura API v2 クライアント
  */
@@ -299,6 +412,117 @@ export class OuraApiClient {
       'daily_stress',
       this.getDateParams(startDate, endDate)
     );
+  }
+
+  /**
+   * VO2 Maxを取得
+   */
+  async getVO2Max(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<VO2MaxData[]> {
+    return this.fetch<VO2MaxData>(
+      'vo2_max',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Daily Cardiovascular Ageを取得
+   */
+  async getDailyCardiovascularAge(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<DailyCardiovascularAgeData[]> {
+    return this.fetch<DailyCardiovascularAgeData>(
+      'daily_cardiovascular_age',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Daily Resilienceを取得
+   */
+  async getDailyResilience(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<DailyResilienceData[]> {
+    return this.fetch<DailyResilienceData>(
+      'daily_resilience',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Workoutを取得
+   */
+  async getWorkouts(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<WorkoutData[]> {
+    return this.fetch<WorkoutData>(
+      'workout',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Sessionを取得
+   */
+  async getSessions(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<SessionData[]> {
+    return this.fetch<SessionData>(
+      'session',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Sleep Timeを取得
+   */
+  async getSleepTime(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<SleepTimeData[]> {
+    return this.fetch<SleepTimeData>(
+      'sleep_time',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Enhanced Tagを取得
+   */
+  async getEnhancedTags(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<EnhancedTagData[]> {
+    return this.fetch<EnhancedTagData>(
+      'enhanced_tag',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Rest Mode Periodを取得
+   */
+  async getRestModePeriods(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<RestModePeriodData[]> {
+    return this.fetch<RestModePeriodData>(
+      'rest_mode_period',
+      this.getDateParams(startDate, endDate)
+    );
+  }
+
+  /**
+   * Ring Configurationを取得
+   */
+  async getRingConfiguration(): Promise<RingConfigurationData[]> {
+    return this.fetch<RingConfigurationData>('ring_configuration', {});
   }
 
   /**

@@ -1,6 +1,6 @@
 {
   "name": "@health-manager/oura-ring",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Oura Ring Data Source Plugin for Health Manager",
   "main": "dist/index.js",
   "type": "module",
