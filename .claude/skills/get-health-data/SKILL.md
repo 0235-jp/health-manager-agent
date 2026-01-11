@@ -18,7 +18,7 @@
   - `range`: 期間を指定してデータを取得
   - `aggregate`: 集計データを取得
   - `trend`: トレンド分析データを取得
-- **data_types**: 取得するデータタイプの配列（例: weight, sleep_duration, steps）
+- **data_types**: 取得するデータタイプの配列（例: body_weight, sleep_duration, steps）
 - **start_date**: 開始日（YYYY-MM-DD形式）
 - **end_date**: 終了日（YYYY-MM-DD形式）
 
@@ -45,7 +45,7 @@
 {
   "data": [
     {
-      "data_type": "weight",
+      "data_type": "body_weight",
       "value": 70.5,
       "unit": "kg",
       "recorded_at": "2026-01-10T08:00:00Z"

@@ -42,9 +42,9 @@ function SummaryCard({ title, value, unit, trend, isLoading }: SummaryCardProps)
   );
 }
 
-const DATA_TYPES = ['weight', 'sleep_duration', 'steps'];
+const DATA_TYPES = ['body_weight', 'sleep_duration', 'steps'];
 const DATA_TYPE_LABELS: Record<string, { label: string; unit: string; color: string }> = {
-  weight: { label: '体重', unit: 'kg', color: '#3b82f6' },
+  body_weight: { label: '体重', unit: 'kg', color: '#3b82f6' },
   sleep_duration: { label: '睡眠時間', unit: 'h', color: '#10b981' },
   steps: { label: '歩数', unit: '', color: '#f59e0b' },
 };

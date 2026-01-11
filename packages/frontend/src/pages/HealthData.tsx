@@ -243,7 +243,7 @@ export function HealthData(): ReactElement {
         <div className="flex flex-wrap gap-4">
           <select className="rounded-lg border border-gray-300 px-3 py-2">
             <option value="">すべてのタイプ</option>
-            <option value="weight">体重</option>
+            <option value="body_weight">体重</option>
             <option value="sleep_duration">睡眠時間</option>
             <option value="steps">歩数</option>
           </select>

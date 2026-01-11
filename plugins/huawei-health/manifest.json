@@ -1,0 +1,124 @@
+{
+  "name": "huawei-health",
+  "displayName": "Huawei Health",
+  "version": "1.0.0",
+  "type": "data-source",
+  "description": "Huawei Health Kit REST APIからヘルスデータを取得",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "supportedDataTypes": [
+    { "name": "steps", "displayName": "歩数", "category": "活動", "unit": "count" },
+    { "name": "huawei:distance", "displayName": "移動距離", "category": "活動", "unit": "meters" },
+    { "name": "huawei:calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "huawei:active_calories", "displayName": "アクティブカロリー", "category": "活動", "unit": "kcal" },
+    { "name": "huawei:bmr_calories", "displayName": "基礎代謝カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "workout_duration", "displayName": "ワークアウト時間", "category": "活動", "unit": "minutes" },
+    { "name": "workout_calories", "displayName": "ワークアウトカロリー", "category": "活動", "unit": "kcal" },
+    { "name": "huawei:speed", "displayName": "速度", "category": "活動", "unit": "m/s" },
+    { "name": "huawei:pace", "displayName": "ペース", "category": "活動", "unit": "min/km" },
+    { "name": "huawei:cycling_wheel_rotation", "displayName": "ホイール回転数", "category": "活動", "unit": "rpm" },
+    { "name": "huawei:pedaling_rate", "displayName": "ペダリング回転数", "category": "活動", "unit": "rpm" },
+    { "name": "huawei:floors_climbed", "displayName": "登った階数", "category": "活動", "unit": "count" },
+    { "name": "huawei:climbing_height", "displayName": "登り高さ", "category": "活動", "unit": "meters" },
+
+    { "name": "heart_rate", "displayName": "心拍数", "category": "心臓", "unit": "bpm" },
+    { "name": "resting_heart_rate", "displayName": "安静時心拍数", "category": "心臓", "unit": "bpm" },
+    { "name": "huawei:hrv", "displayName": "心拍変動(HRV)", "category": "心臓", "unit": "ms", "description": "SDNN/rMSSD" },
+    { "name": "spo2", "displayName": "血中酸素飽和度", "category": "心臓", "unit": "%" },
+    { "name": "blood_pressure_systolic", "displayName": "収縮期血圧", "category": "心臓", "unit": "mmHg" },
+    { "name": "blood_pressure_diastolic", "displayName": "拡張期血圧", "category": "心臓", "unit": "mmHg" },
+    { "name": "huawei:bradycardia", "displayName": "徐脈記録", "category": "心臓", "unit": "event" },
+    { "name": "huawei:tachycardia", "displayName": "頻脈記録", "category": "心臓", "unit": "event" },
+    { "name": "ecg", "displayName": "心電図(ECG)", "category": "心臓", "unit": "waveform", "description": "単極誘導ECG波形" },
+    { "name": "ecg_afib", "displayName": "心房細動検出", "category": "心臓", "unit": "event", "description": "A-fib検出" },
+
+    { "name": "sleep_duration", "displayName": "睡眠時間", "category": "睡眠", "unit": "hours" },
+    { "name": "deep_sleep", "displayName": "深い睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "light_sleep", "displayName": "浅い睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "rem_sleep", "displayName": "レム睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "huawei:awake_time", "displayName": "覚醒時間", "category": "睡眠", "unit": "minutes" },
+    { "name": "huawei:sleep_score", "displayName": "睡眠スコア", "category": "睡眠", "unit": "score" },
+    { "name": "huawei:sleep_respiratory_rate", "displayName": "睡眠時呼吸数", "category": "睡眠", "unit": "breaths/min" },
+    { "name": "huawei:sleep_respiratory_event", "displayName": "睡眠時呼吸イベント", "category": "睡眠", "unit": "event" },
+
+    { "name": "body_weight", "displayName": "体重", "category": "身体", "unit": "kg" },
+    { "name": "huawei:body_height", "displayName": "身長", "category": "身体", "unit": "cm" },
+    { "name": "body_fat", "displayName": "体脂肪率", "category": "身体", "unit": "%" },
+    { "name": "huawei:bmi", "displayName": "BMI", "category": "身体", "unit": "kg/m2" },
+    { "name": "muscle_mass", "displayName": "筋肉量", "category": "身体", "unit": "kg" },
+    { "name": "bone_mass", "displayName": "骨量", "category": "身体", "unit": "kg" },
+    { "name": "body_water", "displayName": "体水分率", "category": "身体", "unit": "%" },
+    { "name": "visceral_fat", "displayName": "内臓脂肪レベル", "category": "身体", "unit": "level" },
+
+    { "name": "body_temperature", "displayName": "体温", "category": "体温", "unit": "degC" },
+    { "name": "skin_temperature", "displayName": "皮膚温度", "category": "体温", "unit": "degC" },
+    { "name": "body_temperature_rest", "displayName": "安静時体温", "category": "体温", "unit": "degC" },
+
+    { "name": "huawei:stress_level", "displayName": "ストレスレベル", "category": "精神", "unit": "score" },
+
+    { "name": "vo2_max", "displayName": "VO2 Max", "category": "フィットネス", "unit": "ml/kg/min" },
+
+    { "name": "huawei:gps_latitude", "displayName": "緯度", "category": "位置情報", "unit": "degrees" },
+    { "name": "huawei:gps_longitude", "displayName": "経度", "category": "位置情報", "unit": "degrees" },
+    { "name": "huawei:altitude", "displayName": "高度", "category": "位置情報", "unit": "meters" },
+
+    { "name": "water_intake", "displayName": "水分摂取量", "category": "栄養", "unit": "ml" },
+    { "name": "calories_intake", "displayName": "摂取カロリー", "category": "栄養", "unit": "kcal" },
+    { "name": "nutrition_protein", "displayName": "たんぱく質摂取", "category": "栄養", "unit": "g" },
+    { "name": "nutrition_carbs", "displayName": "炭水化物摂取", "category": "栄養", "unit": "g" },
+    { "name": "nutrition_fat", "displayName": "脂質摂取", "category": "栄養", "unit": "g" },
+
+    { "name": "blood_glucose", "displayName": "血糖値", "category": "健康", "unit": "mmol/L" },
+    { "name": "cgm_blood_glucose", "displayName": "CGM血糖値", "category": "健康", "unit": "mmol/L", "description": "持続血糖モニタリング" },
+
+    { "name": "uric_acid", "displayName": "尿酸値", "category": "健康", "unit": "umol/L" },
+    { "name": "urine_bilirubin", "displayName": "尿ビリルビン", "category": "健康", "unit": "level" },
+    { "name": "urine_glucose", "displayName": "尿糖", "category": "健康", "unit": "level" },
+
+    { "name": "huawei:breathing_rate", "displayName": "呼吸数", "category": "呼吸器", "unit": "breaths/min" },
+    { "name": "huawei:ventilator", "displayName": "人工呼吸器データ", "category": "呼吸器", "unit": "event" },
+
+    { "name": "menstrual_flow", "displayName": "月経量", "category": "女性の健康", "unit": "level" },
+    { "name": "menstrual_cycle", "displayName": "月経周期", "category": "女性の健康", "unit": "days" },
+    { "name": "ovulation_detection", "displayName": "排卵検出", "category": "女性の健康", "unit": "event" },
+    { "name": "cervical_mucus", "displayName": "頸管粘液", "category": "女性の健康", "unit": "level" },
+    { "name": "dysmenorrhoea", "displayName": "月経痛", "category": "女性の健康", "unit": "level" }
+  ],
+  "fetchStrategy": "both",
+  "defaultFetchInterval": 60,
+  "configSchema": {
+    "clientId": {
+      "type": "string",
+      "label": "Client ID",
+      "description": "Huawei Developer ConsoleのClient ID",
+      "required": true
+    },
+    "clientSecret": {
+      "type": "string",
+      "label": "Client Secret",
+      "description": "Huawei Developer ConsoleのClient Secret",
+      "required": true,
+      "secret": true
+    },
+    "accessToken": {
+      "type": "string",
+      "label": "Access Token",
+      "description": "OAuth認証後に取得されるアクセストークン（自動設定）",
+      "required": false,
+      "secret": true
+    },
+    "refreshToken": {
+      "type": "string",
+      "label": "Refresh Token",
+      "description": "トークン更新用のリフレッシュトークン（自動設定）",
+      "required": false,
+      "secret": true
+    },
+    "tokenExpiresAt": {
+      "type": "number",
+      "label": "Token Expiry",
+      "description": "トークン有効期限（Unixタイムスタンプ、自動設定）",
+      "required": false
+    }
+  }
+}
