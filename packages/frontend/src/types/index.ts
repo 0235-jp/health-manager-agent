@@ -60,3 +60,30 @@ export interface TrendResult {
   latest_value: number;
   first_value: number;
 }
+
+export interface MetricValue {
+  value: number;
+  unit: string;
+  trend: 'up' | 'down' | 'stable';
+}
+
+export interface ReportContent {
+  summary: string;
+  metrics: Record<string, MetricValue>;
+  risks: string[];
+  recommendations: string[];
+}
+
+export interface Report {
+  id: number;
+  report_type: 'on_fetch' | 'daily';
+  period_start: string;
+  period_end: string;
+  content: ReportContent;
+  created_at: string;
+}
+
+export interface GenerateReportInput {
+  report_type: 'on_fetch' | 'daily';
+  target_date?: string;
+}

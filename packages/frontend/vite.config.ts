@@ -11,6 +11,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,  // 0.0.0.0 でバインド（外部からアクセス可能）
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

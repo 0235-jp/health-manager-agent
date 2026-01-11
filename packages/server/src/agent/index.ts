@@ -52,4 +52,4 @@ export class AgentService {
   }
 }
 
-export { AgentAdapter, GenerateReportParams, ReportContent } from './interfaces/agent-adapter.js';
+export type { AgentAdapter, GenerateReportParams, ReportContent } from './interfaces/agent-adapter.js';

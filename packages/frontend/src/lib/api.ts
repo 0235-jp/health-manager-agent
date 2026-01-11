@@ -6,6 +6,8 @@ import type {
   CreateCustomInstructionInput,
   UpdateCustomInstructionInput,
   TrendResult,
+  Report,
+  GenerateReportInput,
 } from '../types';
 
 const API_BASE = '/api';
@@ -145,4 +147,38 @@ export const api = {
       return fetchJson(`/custom-instructions/${id}/toggle`, { method: 'PATCH' });
     },
   },
+
+  reports: {
+    list(params: ReportListParams = {}): Promise<PaginatedResponse<Report>> {
+      return fetchJson(`/reports${buildQueryString(params)}`);
+    },
+
+    get(id: number): Promise<Report> {
+      return fetchJson(`/reports/${id}`);
+    },
+
+    getLatest(reportType?: 'on_fetch' | 'daily'): Promise<Report> {
+      const query = reportType ? `?report_type=${reportType}` : '';
+      return fetchJson(`/reports/latest${query}`);
+    },
+
+    generate(data: GenerateReportInput): Promise<Report> {
+      return fetchJson('/reports/generate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    delete(id: number): Promise<void> {
+      return fetchJson(`/reports/${id}`, { method: 'DELETE' });
+    },
+  },
 };
+
+interface ReportListParams {
+  report_type?: 'on_fetch' | 'daily';
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  offset?: number;
+}

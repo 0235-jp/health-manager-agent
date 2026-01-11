@@ -1,7 +1,14 @@
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { query, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import path from 'path';
 import type { AgentAdapter, GenerateReportParams, ReportContent } from '../interfaces/agent-adapter.js';
 import { buildSystemPrompt, buildUserPrompt } from '../prompts.js';
 import { customInstructionsRepository } from '../../db/repositories/custom-instructions.js';
+import { config } from '../../config/index.js';
+
+type ToolInput = Record<string, unknown>;
+
+// Tools available for health data analysis
+const AVAILABLE_TOOLS = ['Bash', 'Skill'] as const;
 
 const REPORT_SCHEMA = {
   type: 'object',
@@ -27,25 +34,76 @@ const REPORT_SCHEMA = {
 
 export class AnthropicAgentAdapter implements AgentAdapter {
   readonly name = 'anthropic';
+  private projectRoot: string;
+  private serverBaseUrl: string;
+
+  constructor() {
+    this.projectRoot = path.resolve(import.meta.dirname, '../../../../..');
+    this.serverBaseUrl = config.serverBaseUrl;
+  }
 
   async initialize(): Promise<void> {}
+
+  private canUseTool = async (
+    toolName: string,
+    input: ToolInput
+  ): Promise<PermissionResult> => {
+    if (toolName === 'Bash') {
+      const command = input.command as string;
+
+      if (command.includes('curl')) {
+        const isLocalRequest =
+          command.includes(this.serverBaseUrl) ||
+          command.includes('localhost:') ||
+          command.includes('127.0.0.1:');
+
+        if (isLocalRequest) {
+          return { behavior: 'allow', updatedInput: input };
+        }
+
+        return {
+          behavior: 'deny',
+          message: `外部へのリクエストは許可されていません: ${command}`,
+        };
+      }
+
+      return {
+        behavior: 'deny',
+        message: `Bashコマンドは許可されていません: ${command}`,
+      };
+    }
+
+    if (toolName === 'Skill') {
+      return { behavior: 'allow', updatedInput: input };
+    }
+
+    return {
+      behavior: 'deny',
+      message: `ツール ${toolName} は許可されていません`,
+    };
+  };
 
   async generateReport(params: GenerateReportParams): Promise<ReportContent> {
     const customInstructions =
       params.customInstructions ?? customInstructionsRepository.findActive();
 
-    const systemPrompt = buildSystemPrompt(params.reportType, customInstructions);
+    const systemPrompt = buildSystemPrompt({
+      reportType: params.reportType,
+      customInstructions,
+      serverBaseUrl: this.serverBaseUrl,
+    });
     const userPrompt = buildUserPrompt(params.periodStart, params.periodEnd);
 
     const q = query({
       prompt: userPrompt,
       options: {
+        cwd: this.projectRoot,
         systemPrompt,
+        settingSources: ['project'],
         model: 'claude-opus-4-5-20251101',
-        maxTurns: 1,
-        tools: [],
+        tools: [...AVAILABLE_TOOLS],
+        canUseTool: this.canUseTool,
         outputFormat: { type: 'json_schema', schema: REPORT_SCHEMA },
-        permissionMode: 'dontAsk',
         persistSession: false,
       },
     });
@@ -58,7 +116,6 @@ export class AnthropicAgentAdapter implements AgentAdapter {
           try {
             reportContent = JSON.parse(message.result) as ReportContent;
           } catch {
-            // If JSON parsing fails, create a basic report from the text
             reportContent = this.createFallbackReport(message.result);
           }
         } else if (message.subtype.startsWith('error_')) {

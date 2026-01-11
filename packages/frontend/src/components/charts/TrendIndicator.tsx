@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react';
+
 interface TrendIndicatorProps {
   trend: 'up' | 'down' | 'stable';
   value?: number;
@@ -10,7 +12,7 @@ export function TrendIndicator({
   value,
   unit = '',
   showValue = true,
-}: TrendIndicatorProps) {
+}: TrendIndicatorProps): ReactElement {
   const config = {
     up: {
       icon: '\u2197',

@@ -26,8 +26,23 @@ export const customInstructionCreateSchema = z.object({
 
 export const customInstructionUpdateSchema = customInstructionCreateSchema.partial();
 
+export const reportQuerySchema = z.object({
+  report_type: z.enum(['on_fetch', 'daily']).optional(),
+  start_date: z.string().datetime().optional(),
+  end_date: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
+
+export const generateReportSchema = z.object({
+  report_type: z.enum(['on_fetch', 'daily']),
+  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
 export type HealthDataQuery = z.infer<typeof healthDataQuerySchema>;
 export type HealthDataCreate = z.infer<typeof healthDataCreateSchema>;
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
 export type CustomInstructionCreate = z.infer<typeof customInstructionCreateSchema>;
 export type CustomInstructionUpdate = z.infer<typeof customInstructionUpdateSchema>;
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
+export type GenerateReport = z.infer<typeof generateReportSchema>;

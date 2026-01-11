@@ -1,13 +1,22 @@
 import type { CustomInstructionRecord } from '../db/repositories/custom-instructions.js';
 
-export function buildSystemPrompt(
-  reportType: 'on_fetch' | 'daily',
-  customInstructions: CustomInstructionRecord[]
-): string {
+export interface BuildSystemPromptParams {
+  reportType: 'on_fetch' | 'daily';
+  customInstructions: CustomInstructionRecord[];
+  serverBaseUrl: string;
+}
+
+export function buildSystemPrompt(params: BuildSystemPromptParams): string {
+  const { reportType, customInstructions, serverBaseUrl } = params;
   const reportTypeLabel = reportType === 'daily' ? '日次' : '定期';
 
   let prompt = `あなたはヘルスデータアナリストです。
 ユーザーのヘルスデータを分析し、${reportTypeLabel}評価レポートを作成してください。
+
+## サーバー情報
+SERVER_BASE_URL: ${serverBaseUrl}
+
+ヘルスデータを取得するには、get-health-data スキルを使用してください。
 
 レポートには以下を含めてください：
 - 全体的な健康状態のサマリー

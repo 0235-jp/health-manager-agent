@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { LineChart, type ChartDataPoint } from '../components/charts/LineChart';
+import { Markdown } from '../components/Markdown';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
 import type { TrendResult } from '../types';
 
@@ -80,6 +82,12 @@ export function Dashboard(): ReactElement {
 
       return response.data;
     },
+  });
+
+  const { data: latestReport } = useQuery({
+    queryKey: ['reports', 'latest', 'daily'],
+    queryFn: () => api.reports.getLatest('daily'),
+    retry: false,
   });
 
   const trendMap = new Map(trendData?.map((t) => [t.data_type, t]) ?? []);
@@ -196,13 +204,37 @@ export function Dashboard(): ReactElement {
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-800">最新レポート</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-800">
+          <Link to="/reports" className="text-sm text-blue-600 hover:text-blue-800">
             すべて見る →
-          </button>
+          </Link>
         </div>
-        <div className="py-8 text-center text-gray-500">
-          レポートはまだありません（Phase 3で実装予定）
-        </div>
+        {latestReport ? (
+          <div>
+            <p className="text-sm text-gray-500">
+              {new Date(latestReport.period_start).toLocaleDateString('ja-JP')} -{' '}
+              {new Date(latestReport.period_end).toLocaleDateString('ja-JP')}
+            </p>
+            <Markdown className="mt-2 text-gray-700">{latestReport.content.summary}</Markdown>
+            {Object.keys(latestReport.content.metrics).length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {Object.entries(latestReport.content.metrics).slice(0, 3).map(([key, metric]) => (
+                  <div key={key} className="flex items-center gap-2 rounded bg-gray-50 px-3 py-1">
+                    <span className="text-sm text-gray-600">{key}:</span>
+                    <span className="font-medium">{metric.value}{metric.unit}</span>
+                    <TrendIndicator trend={metric.trend} showValue={false} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-gray-500">
+            <p>レポートはまだありません</p>
+            <Link to="/reports" className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-800">
+              レポートを生成する →
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
