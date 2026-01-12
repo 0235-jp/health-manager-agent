@@ -1,6 +1,6 @@
-# Anthropic Claude Agent Plugin
+# Claude Agent SDK Plugin
 
-Anthropic Claude Agent SDKを使用してヘルスデータを分析し、レポートを生成するAIエージェントプラグインです。
+Claude Agent SDKを使用してヘルスデータを分析し、レポートを生成するAIエージェントプラグインです。
 
 ## 概要
 
@@ -42,39 +42,41 @@ Anthropic Claude Agent SDKを使用してヘルスデータを分析し、レポ
 
 ## 設定
 
-### 環境変数
+### プラグイン設定（UI）
+
+| 設定項目 | 型 | 必須 | デフォルト | 説明 |
+|----------|-----|------|----------|------|
+| `model` | select | No | `claude-opus-4-5-20251101` | 使用するClaudeモデル |
+| `apiKey` | string | No | - | Anthropic API Key |
+| `baseUrl` | string | No | - | カスタムエンドポイント（通常は空欄でOK） |
+
+### 環境変数（オプション）
 
 | 変数名 | 必須 | 説明 |
 |--------|------|------|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic APIキー |
 | `SERVER_BASE_URL` | No | サーバーのベースURL（デフォルト: `http://localhost:3001`） |
-
-### プラグイン設定
-
-| 設定項目 | 型 | デフォルト | 説明 |
-|----------|-----|----------|------|
-| `model` | select | `claude-opus-4-5-20251101` | 使用するClaudeモデル |
 
 ## インストール
 
-1. `plugins/anthropic-agent` ディレクトリに配置
+1. `plugins/claude-agent-sdk` ディレクトリに配置
 2. 依存関係をインストール:
    ```bash
-   cd plugins/anthropic-agent
+   cd plugins/claude-agent-sdk
    npm install
    ```
 3. ビルド:
    ```bash
    npm run build
    ```
-4. 環境変数 `ANTHROPIC_API_KEY` を設定
-5. プラグイン管理画面からインストール
+4. プラグイン管理画面からインストール
+5. 設定画面でAPI Keyを入力
 
 ## 使用方法
 
-1. プラグイン管理画面で「Anthropic Claude」を有効化
-2. モデルを選択（設定で変更可能）
-3. エージェントプラグインとして選択されると、スケジューラーによる定期レポート生成や手動分析で使用されます
+1. プラグイン管理画面で「Claude Agent SDK」を有効化
+2. 設定画面でAPI Keyを入力
+3. モデルを選択（設定で変更可能）
+4. エージェントプラグインとして選択されると、スケジューラーによる定期レポート生成や手動分析で使用されます
 
 ## セキュリティ
 
@@ -90,12 +92,6 @@ Anthropic Claude Agent SDKを使用してヘルスデータを分析し、レポ
 
 ```bash
 npm run build
-```
-
-### 型チェック
-
-```bash
-npm run typecheck
 ```
 
 ## ライセンス

@@ -1,9 +1,9 @@
 {
-  "name": "anthropic-agent",
-  "displayName": "Anthropic Claude",
+  "name": "claude-agent-sdk",
+  "displayName": "Claude Agent SDK",
   "version": "1.0.0",
   "type": "agent",
-  "description": "Anthropic Claude Agent SDKを使用したAI分析プラグイン",
+  "description": "Claude Agent SDKを使用したAI分析プラグイン",
   "author": "Health Manager Agent",
   "main": "dist/index.js",
   "provider": "anthropic",
@@ -24,7 +24,19 @@
         { "value": "claude-opus-4-5-20251101", "label": "Claude Opus 4.5" },
         { "value": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4" }
       ]
+    },
+    "apiKey": {
+      "type": "string",
+      "label": "API Key",
+      "description": "Anthropic API Key",
+      "required": false,
+      "secret": true
+    },
+    "baseUrl": {
+      "type": "string",
+      "label": "Base URL",
+      "description": "カスタムエンドポイント（通常は空欄でOK）",
+      "required": false
     }
-  },
-  "requiredEnvVars": ["ANTHROPIC_API_KEY"]
+  }
 }

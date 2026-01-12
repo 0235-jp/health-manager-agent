@@ -1,7 +1,7 @@
 {
-  "name": "@health-manager/anthropic-agent",
+  "name": "@health-manager/claude-agent-sdk",
   "version": "1.0.0",
-  "description": "Anthropic Claude Agent Plugin for Health Manager",
+  "description": "Claude Agent SDK Plugin for Health Manager",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

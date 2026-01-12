@@ -1,7 +1,7 @@
 /**
- * Anthropic Claude Agent Plugin
+ * Claude Agent SDK Plugin
  *
- * Anthropic Claude Agent SDKを使用してヘルスデータ分析レポートを生成するプラグイン
+ * Claude Agent SDKを使用してヘルスデータ分析レポートを生成するプラグイン
  */
 
 import { query, type PermissionResult } from '@anthropic-ai/claude-agent-sdk';
@@ -27,7 +27,6 @@ interface AgentManifest {
     vision?: boolean;
   };
   configSchema?: Record<string, unknown>;
-  requiredEnvVars?: string[];
 }
 
 interface GenerateReportParams {
@@ -147,11 +146,11 @@ function buildUserPrompt(periodStart: Date, periodEnd: Date): string {
 }
 
 /**
- * Anthropic Agent Plugin 実装
+ * Claude Agent SDK Plugin 実装
  */
-class AnthropicAgentPlugin implements AgentPlugin {
+class ClaudeAgentPlugin implements AgentPlugin {
   readonly manifest: AgentManifest;
-  readonly name = 'anthropic';
+  readonly name = 'claude-agent-sdk';
 
   private projectRoot: string;
   private serverBaseUrl: string = 'http://localhost:3001';
@@ -164,17 +163,26 @@ class AnthropicAgentPlugin implements AgentPlugin {
   }
 
   async initialize(config: Record<string, unknown>): Promise<void> {
-    // 設定からモデルを取得
-    if (config.model && typeof config.model === 'string') {
-      this.model = config.model;
-    }
+    this.applyStringConfig(config, 'model', (value) => { this.model = value; });
+    this.applyStringConfig(config, 'apiKey', (value) => { process.env.ANTHROPIC_API_KEY = value; });
+    this.applyStringConfig(config, 'baseUrl', (value) => { process.env.ANTHROPIC_BASE_URL = value; });
 
-    // 環境変数からサーバーURLを取得
     if (process.env.SERVER_BASE_URL) {
       this.serverBaseUrl = process.env.SERVER_BASE_URL;
     }
 
-    console.log(`[AnthropicAgentPlugin] Initialized with model: ${this.model}`);
+    console.log(`[ClaudeAgentPlugin] Initialized with model: ${this.model}`);
+  }
+
+  private applyStringConfig(
+    config: Record<string, unknown>,
+    key: string,
+    apply: (value: string) => void
+  ): void {
+    const value = config[key];
+    if (typeof value === 'string' && value) {
+      apply(value);
+    }
   }
 
   async dispose(): Promise<void> {
@@ -188,39 +196,30 @@ class AnthropicAgentPlugin implements AgentPlugin {
     toolName: string,
     input: ToolInput
   ): Promise<PermissionResult> => {
-    if (toolName === 'Bash') {
-      const command = input.command as string;
-
-      if (command.includes('curl')) {
-        const isLocalRequest =
-          command.includes(this.serverBaseUrl) ||
-          command.includes('localhost:') ||
-          command.includes('127.0.0.1:');
-
-        if (isLocalRequest) {
-          return { behavior: 'allow', updatedInput: input };
-        }
-
-        return {
-          behavior: 'deny',
-          message: `外部へのリクエストは許可されていません: ${command}`,
-        };
-      }
-
-      return {
-        behavior: 'deny',
-        message: `Bashコマンドは許可されていません: ${command}`,
-      };
-    }
-
     if (toolName === 'Skill') {
       return { behavior: 'allow', updatedInput: input };
     }
 
-    return {
-      behavior: 'deny',
-      message: `ツール ${toolName} は許可されていません`,
-    };
+    if (toolName !== 'Bash') {
+      return { behavior: 'deny', message: `ツール ${toolName} は許可されていません` };
+    }
+
+    const command = input.command as string;
+
+    if (!command.includes('curl')) {
+      return { behavior: 'deny', message: `Bashコマンドは許可されていません: ${command}` };
+    }
+
+    const isLocalRequest =
+      command.includes(this.serverBaseUrl) ||
+      command.includes('localhost:') ||
+      command.includes('127.0.0.1:');
+
+    if (isLocalRequest) {
+      return { behavior: 'allow', updatedInput: input };
+    }
+
+    return { behavior: 'deny', message: `外部へのリクエストは許可されていません: ${command}` };
   };
 
   async generateReport(params: GenerateReportParams): Promise<ReportContent> {
@@ -295,12 +294,7 @@ function loadManifest(): AgentManifest {
  * プラグインファクトリ関数
  */
 export function createPlugin(): AgentPlugin {
-  return new AnthropicAgentPlugin(loadManifest());
+  return new ClaudeAgentPlugin(loadManifest());
 }
 
-/**
- * デフォルトエクスポート（ファクトリ関数）
- */
-export default function(): AgentPlugin {
-  return new AnthropicAgentPlugin(loadManifest());
-}
+export default createPlugin;
