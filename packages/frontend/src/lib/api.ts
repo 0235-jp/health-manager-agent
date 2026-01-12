@@ -14,6 +14,7 @@ import type {
   PluginTestResult,
   PluginInstallResult,
   FetchResult,
+  DataType,
 } from '../types';
 
 const API_BASE = '/api';
@@ -257,7 +258,15 @@ export const api = {
       });
     },
   },
+
+  dataTypes: {
+    list(): Promise<{ data: DataType[] }> {
+      return fetchJson('/data-types');
+    },
+  },
 };
+
+// Scheduler API types
 
 interface ReportListParams {
   report_type?: 'on_fetch' | 'daily';
@@ -266,3 +275,63 @@ interface ReportListParams {
   limit?: number;
   offset?: number;
 }
+
+interface PluginStatusEntry {
+  pluginName: string;
+  lastCollectionTime: string | null;
+  lastSuccessTime: string | null;
+  consecutiveFailures: number;
+  updatedAt: string;
+}
+
+interface PluginCollectionEntry {
+  pluginName: string;
+  success: boolean;
+  recordCount: number;
+  errors?: string[];
+}
+
+export interface SchedulerStatus {
+  plugins: PluginStatusEntry[];
+}
+
+export interface DataCollectionResult {
+  success: boolean;
+  totalFetched: number;
+  inserted: number;
+  skipped: number;
+  plugins: PluginCollectionEntry[];
+}
+
+export interface BackfillResult {
+  success: boolean;
+  totalFetched: number;
+  inserted: number;
+  skipped: number;
+  errors: Array<{ pluginName: string; error: string }>;
+}
+
+export const schedulerApi = {
+  getStatus(): Promise<SchedulerStatus> {
+    return fetchJson('/scheduler/status');
+  },
+
+  runCollection(): Promise<DataCollectionResult> {
+    return fetchJson('/scheduler/run-collection', { method: 'POST' });
+  },
+
+  runDailyReport(): Promise<{ success: boolean; message: string }> {
+    return fetchJson('/scheduler/run-daily-report', { method: 'POST' });
+  },
+
+  runBackfill(params: {
+    startDate: string;
+    endDate: string;
+    pluginNames?: string[];
+  }): Promise<BackfillResult> {
+    return fetchJson('/scheduler/run-backfill', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  },
+};

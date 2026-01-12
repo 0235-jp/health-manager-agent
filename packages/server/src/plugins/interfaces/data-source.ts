@@ -56,6 +56,24 @@ export interface FetchResult {
 }
 
 /**
+ * プラグインごとのデータ取得オプション
+ */
+export interface PerPluginFetchOptions {
+  [pluginName: string]: FetchOptions;
+}
+
+/**
+ * プラグインごとのデータ取得結果
+ */
+export interface PluginFetchResult {
+  pluginName: string;
+  success: boolean;
+  data: HealthDataInput[];
+  errors?: string[];
+  fetchedAt: Date;
+}
+
+/**
  * 接続テスト結果
  */
 export interface ConnectionTestResult {

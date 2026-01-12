@@ -118,10 +118,9 @@ class WebhookNotificationPlugin implements NotificationPlugin {
       this.webhookUrl = config.webhookUrl;
     }
 
-    // 有効なイベントを取得
-    if (config.enabledEvents && typeof config.enabledEvents === 'string') {
-      const events = config.enabledEvents.split(',').map((e) => e.trim());
-      this.enabledEvents = new Set(events as NotificationEventType[]);
+    // 有効なイベントを取得（配列形式）
+    if (config.enabledEvents && Array.isArray(config.enabledEvents)) {
+      this.enabledEvents = new Set(config.enabledEvents as NotificationEventType[]);
     } else {
       // デフォルト: 日次レポートとアラート
       this.enabledEvents = new Set(['report:daily', 'health:alert']);

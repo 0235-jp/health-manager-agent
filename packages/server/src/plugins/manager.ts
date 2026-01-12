@@ -12,8 +12,11 @@ import type {
   HealthDataInput,
   NotificationEvent,
   NotificationPlugin,
+  PerPluginFetchOptions,
+  PluginFetchResult,
   PluginType,
 } from './interfaces/index.js';
+import { pluginsRepository } from '../db/repositories/plugins.js';
 
 /**
  * プラグインマネージャー
@@ -25,12 +28,14 @@ export class PluginManager {
   private loader: PluginLoader;
   private registry: PluginRegistry;
   private eventBus: EventBus;
+  private pluginsDir: string;
   private currentAgentName: string | null = null;
   private initialized = false;
   private pluginConfigStore: Map<string, Record<string, unknown>> = new Map();
   private pluginUnsubscribers: Map<string, () => void> = new Map();
 
   private constructor(pluginsDir: string) {
+    this.pluginsDir = pluginsDir;
     this.loader = new PluginLoader(pluginsDir);
     this.registry = new PluginRegistry();
     this.eventBus = new EventBus();
@@ -73,11 +78,31 @@ export class PluginManager {
 
     console.log('[PluginManager] Initializing...');
 
-    // プラグインは自動ロードしない（WebUIからインポート）
-    // ここでは初期化のみ
+    // DBからアクティブなプラグインを取得してロード
+    const activePlugins = pluginsRepository.findAll().filter((p) => p.is_active === 1);
+
+    for (const pluginRecord of activePlugins) {
+      try {
+        const pluginPath = path.join(this.pluginsDir, pluginRecord.name);
+        await this.loadPluginFromPath(pluginPath);
+
+        // DBから保存された設定を取得して適用
+        const savedConfig = pluginsRepository.getConfig(pluginRecord.name);
+        if (savedConfig && Object.keys(savedConfig).length > 0) {
+          await this.updatePluginConfig(pluginRecord.name, savedConfig);
+        }
+
+        console.log(`[PluginManager] Auto-loaded plugin: ${pluginRecord.name}`);
+      } catch (error) {
+        console.error(
+          `[PluginManager] Failed to auto-load plugin ${pluginRecord.name}:`,
+          error
+        );
+      }
+    }
 
     this.initialized = true;
-    console.log('[PluginManager] Initialized (no plugins auto-loaded)');
+    console.log(`[PluginManager] Initialized (${activePlugins.length} plugins auto-loaded)`);
   }
 
   /**
@@ -378,6 +403,61 @@ export class PluginManager {
     }
 
     return this.resolveConflicts(results);
+  }
+
+  /**
+   * DataSourceプラグインをプラグインごとのオプションで実行
+   * 各プラグインの成功/失敗を個別に追跡
+   * @param defaultOptions デフォルトの取得オプション
+   * @param perPluginOptions プラグインごとの取得オプション（オプション）
+   * @param pluginNames 実行するプラグイン名（オプション、指定なしで全プラグイン）
+   */
+  async executeDataSourcePluginsWithState(
+    defaultOptions: FetchOptions,
+    perPluginOptions?: PerPluginFetchOptions,
+    pluginNames?: string[]
+  ): Promise<PluginFetchResult[]> {
+    const results: PluginFetchResult[] = [];
+    let plugins = this.registry.getDataSourcePlugins();
+
+    // プラグイン名が指定されていればフィルタ
+    if (pluginNames && pluginNames.length > 0) {
+      plugins = plugins.filter((p) => pluginNames.includes(p.manifest.name));
+    }
+
+    for (const plugin of plugins) {
+      const pluginName = plugin.manifest.name;
+      const fetchedAt = new Date();
+
+      // プラグイン固有のオプションがあれば使用、なければデフォルト
+      const options = perPluginOptions?.[pluginName] || defaultOptions;
+
+      try {
+        const result = await plugin.fetchData(options);
+        results.push({
+          pluginName,
+          success: result.success,
+          data: result.data,
+          errors: result.errors,
+          fetchedAt,
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[PluginManager] DataSource ${pluginName} error:`,
+          error
+        );
+        results.push({
+          pluginName,
+          success: false,
+          data: [],
+          errors: [errorMessage],
+          fetchedAt,
+        });
+      }
+    }
+
+    return results;
   }
 
   /**

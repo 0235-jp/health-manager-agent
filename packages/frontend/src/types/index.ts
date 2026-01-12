@@ -22,7 +22,6 @@ export interface Settings {
   collection_interval: number;
   active_plugins: string[];
   data_source_priority: Record<string, string>;
-  webhook_url: string;
 }
 
 export interface ApiError {
@@ -92,7 +91,7 @@ export interface GenerateReportInput {
 export type PluginType = 'data-source' | 'agent' | 'notification';
 
 export interface ConfigField {
-  type: 'string' | 'number' | 'boolean' | 'select';
+  type: 'string' | 'number' | 'boolean' | 'select' | 'multiselect';
   label: string;
   description?: string;
   required?: boolean;
@@ -158,4 +157,13 @@ export interface FetchResult {
     recordedAt: string;
   }>;
   errors?: string[];
+}
+
+export interface DataType {
+  name: string;
+  display_name: string;
+  category: string | null;
+  unit: string | null;
+  is_standard: boolean;
+  plugin_name: string | null;
 }

@@ -20,6 +20,8 @@ export type {
   FetchOptions,
   HealthDataInput,
   FetchResult,
+  PerPluginFetchOptions,
+  PluginFetchResult,
   ConnectionTestResult,
   DataSourcePlugin,
 } from './data-source.js';

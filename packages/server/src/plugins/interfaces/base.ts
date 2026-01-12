@@ -8,13 +8,13 @@ export type PluginType = 'data-source' | 'agent' | 'notification';
  * 設定フィールドの定義
  */
 export interface ConfigField {
-  type: 'string' | 'number' | 'boolean' | 'select';
+  type: 'string' | 'number' | 'boolean' | 'select' | 'multiselect';
   label: string;
   description?: string;
   required?: boolean;
   secret?: boolean; // trueの場合、UIでマスク表示
-  default?: string | number | boolean;
-  options?: Array<{ value: string; label: string }>; // selectタイプ用
+  default?: string | number | boolean | string[];
+  options?: Array<{ value: string; label: string }>; // select/multiselectタイプ用
 }
 
 /**

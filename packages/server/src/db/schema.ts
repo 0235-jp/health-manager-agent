@@ -18,6 +18,7 @@ export function initializeSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_health_data_type ON health_data(data_type);
     CREATE INDEX IF NOT EXISTS idx_health_data_recorded_at ON health_data(recorded_at);
     CREATE INDEX IF NOT EXISTS idx_health_data_source ON health_data(source);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_health_data_unique ON health_data(data_type, source, recorded_at);
   `);
 
   // data_types table
@@ -102,6 +103,17 @@ export function initializeSchema(): void {
       priority INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // plugin_collection_state table - プラグインごとのデータ収集状態を管理
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS plugin_collection_state (
+      plugin_name TEXT PRIMARY KEY,
+      last_collection_time DATETIME,
+      last_success_time DATETIME,
+      consecutive_failures INTEGER DEFAULT 0,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);

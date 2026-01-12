@@ -1,17 +1,16 @@
 import type { ReactElement, FormEvent } from 'react';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, schedulerApi } from '../lib/api';
+import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
 import type { CustomInstruction } from '../types';
 
 interface SettingsFormData {
   collection_interval: number;
-  webhook_url: string;
 }
 
 const DEFAULT_FORM_DATA: SettingsFormData = {
   collection_interval: 3600,
-  webhook_url: '',
 };
 
 const INTERVAL_OPTIONS = [
@@ -150,6 +149,113 @@ function InstructionItem({
   );
 }
 
+function DataBackfillSection(): ReactElement {
+  const [startDate, setStartDate] = useState(() => formatDateForInput(getDateDaysAgo(7)));
+  const [endDate, setEndDate] = useState(() => formatDateForInput(new Date()));
+
+  const { data: status, isLoading: isLoadingStatus } = useQuery({
+    queryKey: ['scheduler-status'],
+    queryFn: schedulerApi.getStatus,
+  });
+
+  const fetchMutation = useMutation({
+    mutationFn: schedulerApi.runBackfill,
+  });
+
+  function handleFetch(e: FormEvent) {
+    e.preventDefault();
+    if (startDate && endDate) {
+      fetchMutation.mutate({ startDate, endDate });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* プラグイン状態 */}
+      <div>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">プラグイン収集状態</h4>
+        {isLoadingStatus ? (
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        ) : status?.plugins && status.plugins.length > 0 ? (
+          <div className="space-y-2">
+            {status.plugins.map((plugin) => (
+              <div
+                key={plugin.pluginName}
+                className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+              >
+                <span className="font-medium">{plugin.pluginName}</span>
+                <div className="text-right text-gray-600">
+                  {plugin.lastSuccessTime ? (
+                    <span>
+                      最終成功: {new Date(plugin.lastSuccessTime).toLocaleString('ja-JP')}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">未取得</span>
+                  )}
+                  {plugin.consecutiveFailures > 0 && (
+                    <span className="ml-2 text-red-600">
+                      ({plugin.consecutiveFailures}回失敗)
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">アクティブなデータソースプラグインがありません</p>
+        )}
+      </div>
+
+      {/* データ取得フォーム */}
+      <form onSubmit={handleFetch}>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">データ取得</h4>
+        <p className="text-xs text-gray-500 mb-3">
+          指定した期間のデータを取得します。既存データは自動でスキップされます。
+        </p>
+        <div className="flex gap-3 items-end">
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">開始日</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">終了日</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={fetchMutation.isPending || !startDate || !endDate}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {fetchMutation.isPending ? '取得中...' : '取得実行'}
+          </button>
+        </div>
+        {fetchMutation.isSuccess && (
+          <div className="mt-2 text-sm text-green-600">
+            取得完了: {fetchMutation.data.inserted}件追加 / {fetchMutation.data.skipped}件スキップ
+          </div>
+        )}
+        {fetchMutation.isError && (
+          <div className="mt-2 text-sm text-red-600">
+            エラー: {(fetchMutation.error as Error).message}
+          </div>
+        )}
+      </form>
+    </div>
+  );
+}
+
 function CustomInstructionsSection(): ReactElement {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -276,7 +382,6 @@ export function Settings(): ReactElement {
     if (settings) {
       setFormData({
         collection_interval: settings.collection_interval || DEFAULT_FORM_DATA.collection_interval,
-        webhook_url: settings.webhook_url || DEFAULT_FORM_DATA.webhook_url,
       });
     }
   }, [settings]);
@@ -331,30 +436,6 @@ export function Settings(): ReactElement {
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-medium text-gray-800">Webhook</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Webhook URL
-              </label>
-              <input
-                type="url"
-                value={formData.webhook_url}
-                onChange={(e) => updateField('webhook_url', e.target.value)}
-                placeholder="https://example.com/webhook"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
-              />
-            </div>
-            <button
-              type="button"
-              className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
-            >
-              テスト送信
-            </button>
-          </div>
-        </div>
-
         <div className="flex justify-end">
           <button
             type="submit"
@@ -376,6 +457,11 @@ export function Settings(): ReactElement {
           </div>
         )}
       </form>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-800">データ取得</h3>
+        <DataBackfillSection />
+      </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-medium text-gray-800">

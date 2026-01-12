@@ -86,6 +86,14 @@ healthDataRouter.post(
   asyncHandler((req, res) => {
     const data = req.body as HealthDataCreate;
     const record = healthDataRepository.create(data);
+
+    if (!record) {
+      res.status(409).json({
+        error: { message: 'Duplicate data: same data_type and recorded_at already exists' },
+      });
+      return;
+    }
+
     res.status(201).json(record);
   })
 );

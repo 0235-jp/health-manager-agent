@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import type { HealthData as HealthDataType, PaginatedResponse } from '../types';
+import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
 import { DataForm } from '../components/data/DataForm';
 
 const PAGE_SIZE = 20;
@@ -188,12 +188,67 @@ export function HealthData(): ReactElement {
   const [editData, setEditData] = useState<HealthDataType | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<HealthDataType | null>(null);
 
+  // フィルター用state
+  const [filterDataType, setFilterDataType] = useState('');
+  const [filterSource, setFilterSource] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['health-data', page],
-    queryFn: () => api.healthData.list({ limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    queryKey: ['health-data', page, filterDataType, filterSource, filterStartDate, filterEndDate],
+    queryFn: () => api.healthData.list({
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+      data_type: filterDataType || undefined,
+      source: filterSource || undefined,
+      start_date: filterStartDate || undefined,
+      end_date: filterEndDate || undefined,
+    }),
   });
+
+  // データソースプラグイン一覧を取得
+  const { data: plugins } = useQuery({
+    queryKey: ['plugins', 'data-source'],
+    queryFn: () => api.plugins.list('data-source'),
+  });
+
+  // データタイプ一覧を取得
+  const { data: dataTypesResponse } = useQuery({
+    queryKey: ['data-types'],
+    queryFn: () => api.dataTypes.list(),
+  });
+
+  // ソース選択肢を構築（manual + data-sourceプラグイン）
+  const sourceOptions = [
+    { value: 'manual', label: '手動入力' },
+    ...(plugins || []).map((p: Plugin) => ({
+      value: p.name,
+      label: p.displayName,
+    })),
+  ];
+
+  // データタイプ選択肢
+  const dataTypeOptions = (dataTypesResponse?.data || []).map((dt: DataType) => ({
+    value: dt.name,
+    label: dt.display_name,
+  }));
+
+  // フィルター変更時にページをリセット
+  function updateFilterAndResetPage(setter: (value: string) => void, value: string): void {
+    setter(value);
+    setPage(0);
+  }
+
+  // フィルターリセット
+  function resetFilters(): void {
+    setFilterDataType('');
+    setFilterSource('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setPage(0);
+  }
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.healthData.delete(id),
@@ -241,22 +296,47 @@ export function HealthData(): ReactElement {
 
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap gap-4">
-          <select className="rounded-lg border border-gray-300 px-3 py-2">
+          <select
+            value={filterDataType}
+            onChange={(e) => updateFilterAndResetPage(setFilterDataType, e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2"
+          >
             <option value="">すべてのタイプ</option>
-            <option value="body_weight">体重</option>
-            <option value="sleep_duration">睡眠時間</option>
-            <option value="steps">歩数</option>
+            {dataTypeOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
-          <select className="rounded-lg border border-gray-300 px-3 py-2">
+          <select
+            value={filterSource}
+            onChange={(e) => updateFilterAndResetPage(setFilterSource, e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2"
+          >
             <option value="">すべてのソース</option>
-            <option value="manual">手動入力</option>
-            <option value="oura-ring">Oura Ring</option>
-            <option value="huawei-health">Huawei Health</option>
+            {sourceOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
-          <input type="date" className="rounded-lg border border-gray-300 px-3 py-2" />
-          <input type="date" className="rounded-lg border border-gray-300 px-3 py-2" />
-          <button className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200">
-            検索
+          <input
+            type="date"
+            value={filterStartDate}
+            onChange={(e) => updateFilterAndResetPage(setFilterStartDate, e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2"
+          />
+          <input
+            type="date"
+            value={filterEndDate}
+            onChange={(e) => updateFilterAndResetPage(setFilterEndDate, e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2"
+          />
+          <button
+            onClick={resetFilters}
+            className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
+          >
+            リセット
           </button>
         </div>
       </div>

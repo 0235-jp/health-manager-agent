@@ -110,14 +110,47 @@ export const healthDataRepository = {
     return stmt.get(id) as HealthDataRecord | undefined;
   },
 
-  create(data: HealthDataCreate): HealthDataRecord {
+  /**
+   * データを作成（INSERT OR IGNORE で重複をスキップ）
+   * @returns 作成されたレコード、または重複の場合はnull
+   */
+  create(data: HealthDataCreate & { source?: string }): HealthDataRecord | null {
     const db = getDatabase();
+    const source = data.source || 'manual';
     const stmt = db.prepare(`
-      INSERT INTO health_data (data_type, value, unit, source, recorded_at)
-      VALUES (?, ?, ?, 'manual', ?)
+      INSERT OR IGNORE INTO health_data (data_type, value, unit, source, recorded_at)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(data.data_type, data.value, data.unit ?? null, data.recorded_at);
+    const result = stmt.run(data.data_type, data.value, data.unit ?? null, source, data.recorded_at);
+    if (result.changes === 0) {
+      return null; // Already exists (duplicate)
+    }
     return this.findById(result.lastInsertRowid as number)!;
+  },
+
+  /**
+   * バッチでデータを作成（INSERT OR IGNORE で重複をスキップ）
+   * @returns 処理結果（合計件数、挿入件数）
+   */
+  createBatch(items: Array<HealthDataCreate & { source?: string }>): { total: number; inserted: number } {
+    const db = getDatabase();
+    const transaction = db.transaction((data: Array<HealthDataCreate & { source?: string }>) => {
+      const stmt = db.prepare(`
+        INSERT OR IGNORE INTO health_data (data_type, value, unit, source, recorded_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      let inserted = 0;
+      for (const item of data) {
+        const source = item.source || 'manual';
+        const result = stmt.run(item.data_type, item.value, item.unit ?? null, source, item.recorded_at);
+        if (result.changes > 0) {
+          inserted++;
+        }
+      }
+      return inserted;
+    });
+    const inserted = transaction(items);
+    return { total: items.length, inserted };
   },
 
   update(id: number, data: Partial<HealthDataCreate>): HealthDataRecord | undefined {

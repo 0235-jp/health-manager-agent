@@ -21,10 +21,16 @@
       "required": true
     },
     "enabledEvents": {
-      "type": "string",
+      "type": "multiselect",
       "label": "有効なイベント",
-      "description": "通知するイベント（カンマ区切り）",
-      "default": "report:daily,health:alert"
+      "description": "通知するイベントを選択",
+      "options": [
+        { "value": "report:daily", "label": "日次レポート" },
+        { "value": "report:generated", "label": "取得時レポート" },
+        { "value": "health:alert", "label": "ヘルスアラート" },
+        { "value": "data:fetched", "label": "データ取得完了" }
+      ],
+      "default": ["report:daily", "health:alert"]
     },
     "includeFullReport": {
       "type": "boolean",

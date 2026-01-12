@@ -3,6 +3,7 @@
  *
  * - データ収集ジョブ（DataSourceプラグイン経由）
  * - 日次レポートジョブ
+ * - データ補完機能
  * - イベント発火（EventBus経由）
  */
 
@@ -12,12 +13,27 @@ import { PluginManager } from '../plugins/manager.js';
 import { reportsRepository } from '../db/repositories/reports.js';
 import { healthDataRepository } from '../db/repositories/health-data.js';
 import { settingsRepository } from '../db/repositories/settings.js';
+import { pluginCollectionStateRepository } from '../db/repositories/plugin-collection-state.js';
 import type { NotificationEvent } from '../plugins/interfaces/notification.js';
+import type { PerPluginFetchOptions, PluginFetchResult } from '../plugins/interfaces/index.js';
+
+export interface BackfillResult {
+  totalFetched: number;
+  inserted: number;
+  skipped: number;
+  errors: Array<{ pluginName: string; error: string }>;
+}
+
+export interface DataCollectionResult {
+  pluginResults: PluginFetchResult[];
+  totalFetched: number;
+  inserted: number;
+  skipped: number;
+}
 
 export class Scheduler {
   private dataCollectionJob: cron.ScheduledTask | null = null;
   private dailyReportJob: cron.ScheduledTask | null = null;
-  private lastCollectionTime: Date | null = null;
 
   async start(): Promise<void> {
     // データ収集ジョブ（設定から間隔を取得）
@@ -44,113 +60,222 @@ export class Scheduler {
   }
 
   /**
-   * データ収集を実行
+   * データ収集を実行（プラグインごとの状態管理付き）
    */
-  async runDataCollection(): Promise<void> {
+  async runDataCollection(): Promise<DataCollectionResult> {
     console.log('[Scheduler] Starting data collection...');
 
     const pluginManager = PluginManager.getInstance();
     const agentService = AgentService.getInstance();
-
     const periodEnd = new Date();
-    const periodStart = this.lastCollectionTime || new Date(periodEnd.getTime() - 24 * 60 * 60 * 1000);
 
-    try {
-      // 1. DataSourceプラグインからデータ取得
-      const activeDataSources = pluginManager
-        .getPlugins('data-source')
-        .filter((state) => state.isActive);
+    // 1. アクティブなDataSourceプラグインを取得
+    const activeDataSources = pluginManager
+      .getPlugins('data-source')
+      .filter((state) => state.isActive);
 
-      if (activeDataSources.length === 0) {
-        console.log('[Scheduler] No active data source plugins, skipping data collection');
-        this.lastCollectionTime = periodEnd;
-        return;
+    if (activeDataSources.length === 0) {
+      console.log('[Scheduler] No active data source plugins, skipping data collection');
+      return { pluginResults: [], totalFetched: 0, inserted: 0, skipped: 0 };
+    }
+
+    // 2. プラグインごとの開始時刻を計算
+    const perPluginOptions: PerPluginFetchOptions = {};
+    for (const pluginState of activeDataSources) {
+      const pluginName = pluginState.manifest.name;
+      const state = pluginCollectionStateRepository.get(pluginName);
+
+      // 前回成功時刻から取得、なければ24時間前から
+      const startDate = state?.last_success_time
+        ? new Date(state.last_success_time)
+        : new Date(periodEnd.getTime() - 24 * 60 * 60 * 1000);
+
+      perPluginOptions[pluginName] = { startDate, endDate: periodEnd };
+    }
+
+    // 3. プラグインごとにデータ取得
+    const results = await pluginManager.executeDataSourcePluginsWithState(
+      { endDate: periodEnd },
+      perPluginOptions
+    );
+
+    // 4. 結果に応じて状態更新 & データ保存
+    let totalFetched = 0;
+    let inserted = 0;
+    const allData: Array<{ data_type: string; value: number; unit: string; source: string; recorded_at: string }> = [];
+
+    for (const result of results) {
+      if (result.success) {
+        pluginCollectionStateRepository.markSuccess(result.pluginName, result.fetchedAt);
+        console.log(`[Scheduler] Plugin ${result.pluginName}: fetched ${result.data.length} records`);
+      } else {
+        pluginCollectionStateRepository.markFailure(result.pluginName, result.fetchedAt);
+        console.error(`[Scheduler] Plugin ${result.pluginName} failed:`, result.errors);
       }
 
-      const data = await pluginManager.executeDataSourcePlugins({
-        startDate: periodStart,
-        endDate: periodEnd,
-      });
-
-      console.log(`[Scheduler] Fetched ${data.length} data points`);
-
-      // 2. DBに保存
-      if (data.length > 0) {
-        for (const item of data) {
-          try {
-            healthDataRepository.create({
-              data_type: item.dataType,
-              value: item.value,
-              unit: item.unit,
-              recorded_at: item.recordedAt.toISOString(),
-            });
-          } catch (error) {
-            // 重複エラーは無視
-            if (!(error instanceof Error && error.message.includes('UNIQUE'))) {
-              console.error('[Scheduler] Failed to save data:', error);
-            }
-          }
-        }
-
-        // 3. 通知イベント発火（data:fetched）
-        const dataTypes = [...new Set(data.map(d => d.dataType))];
-        await this.publishEvent({
-          type: 'data:fetched',
-          timestamp: new Date(),
-          payload: {
-            sourceName: 'scheduler',
-            recordCount: data.length,
-            dataTypes,
-          },
+      // データを収集
+      for (const item of result.data) {
+        totalFetched++;
+        allData.push({
+          data_type: item.dataType,
+          value: item.value,
+          unit: item.unit,
+          source: result.pluginName,
+          recorded_at: item.recordedAt.toISOString(),
         });
       }
+    }
 
-      // 4. 取得時レポート生成（Agentプラグインがある場合のみ）
-      const currentAgent = pluginManager.getCurrentAgent();
-      if (currentAgent && data.length > 0) {
-        try {
-          const content = await agentService.generateReport({
+    // 5. バッチでDB保存（INSERT OR IGNORE）
+    if (allData.length > 0) {
+      const batchResult = healthDataRepository.createBatch(allData);
+      inserted = batchResult.inserted;
+      console.log(`[Scheduler] Saved ${inserted}/${totalFetched} records (${totalFetched - inserted} duplicates skipped)`);
+
+      // 6. 通知イベント発火（data:fetched）
+      const dataTypes = [...new Set(allData.map(d => d.data_type))];
+      await this.publishEvent({
+        type: 'data:fetched',
+        timestamp: new Date(),
+        payload: {
+          sourceName: 'scheduler',
+          recordCount: inserted,
+          dataTypes,
+        },
+      });
+    }
+
+    // 7. 取得時レポート生成（Agentプラグインがある場合のみ）
+    const currentAgent = pluginManager.getCurrentAgent();
+    if (currentAgent && inserted > 0) {
+      try {
+        // 期間の計算（全プラグインの中で最も早い開始時刻を使用）
+        const periodStart = Object.values(perPluginOptions).reduce(
+          (earliest, opt) => (opt.startDate && opt.startDate < earliest ? opt.startDate : earliest),
+          periodEnd
+        );
+
+        const content = await agentService.generateReport({
+          reportType: 'on_fetch',
+          periodStart,
+          periodEnd,
+        });
+
+        const report = reportsRepository.create({
+          reportType: 'on_fetch',
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+          content,
+        });
+
+        console.log(`[Scheduler] On-fetch report generated: id=${report.id}`);
+
+        await this.publishEvent({
+          type: 'report:generated',
+          timestamp: new Date(),
+          payload: {
+            reportId: report.id,
             reportType: 'on_fetch',
+            content,
             periodStart,
             periodEnd,
-          });
-
-          const report = reportsRepository.create({
-            reportType: 'on_fetch',
-            periodStart: periodStart.toISOString(),
-            periodEnd: periodEnd.toISOString(),
-            content,
-          });
-
-          console.log(`[Scheduler] On-fetch report generated: id=${report.id}`);
-
-          // 5. 通知イベント発火（report:generated）
-          await this.publishEvent({
-            type: 'report:generated',
-            timestamp: new Date(),
-            payload: {
-              reportId: report.id,
-              reportType: 'on_fetch',
-              content,
-              periodStart,
-              periodEnd,
-            },
-          });
-        } catch (error) {
-          console.error('[Scheduler] Failed to generate on-fetch report:', error);
-        }
+          },
+        });
+      } catch (error) {
+        console.error('[Scheduler] Failed to generate on-fetch report:', error);
       }
-
-      this.lastCollectionTime = periodEnd;
-      console.log('[Scheduler] Data collection completed');
-    } catch (error) {
-      console.error('[Scheduler] Data collection failed:', error);
-      throw error;
     }
+
+    console.log('[Scheduler] Data collection completed');
+    return {
+      pluginResults: results,
+      totalFetched,
+      inserted,
+      skipped: totalFetched - inserted,
+    };
   }
 
   /**
-   * 日次レポートを生成
+   * データ補完を実行（指定期間のデータを再取得）
+   */
+  async runDataBackfill(
+    startDate: Date,
+    endDate: Date,
+    pluginNames?: string[]
+  ): Promise<BackfillResult> {
+    console.log(`[Scheduler] Starting data backfill: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+
+    const pluginManager = PluginManager.getInstance();
+    const errors: Array<{ pluginName: string; error: string }> = [];
+
+    // アクティブなDataSourceプラグインを取得（指定があればフィルタ）
+    let activeDataSources = pluginManager
+      .getPlugins('data-source')
+      .filter((state) => state.isActive);
+
+    if (pluginNames && pluginNames.length > 0) {
+      activeDataSources = activeDataSources.filter(
+        (state) => pluginNames.includes(state.manifest.name)
+      );
+    }
+
+    if (activeDataSources.length === 0) {
+      console.log('[Scheduler] No matching active data source plugins for backfill');
+      return { totalFetched: 0, inserted: 0, skipped: 0, errors: [] };
+    }
+
+    // フィルタされたプラグイン名を取得
+    const targetPluginNames = activeDataSources.map((state) => state.manifest.name);
+
+    // プラグインごとにデータ取得（フィルタ適用）
+    const results = await pluginManager.executeDataSourcePluginsWithState(
+      { startDate, endDate },
+      undefined,
+      targetPluginNames
+    );
+
+    // データを収集
+    const allData: Array<{ data_type: string; value: number; unit: string; source: string; recorded_at: string }> = [];
+
+    for (const result of results) {
+      if (!result.success && result.errors) {
+        errors.push({
+          pluginName: result.pluginName,
+          error: result.errors.join(', '),
+        });
+      }
+
+      for (const item of result.data) {
+        allData.push({
+          data_type: item.dataType,
+          value: item.value,
+          unit: item.unit,
+          source: result.pluginName,
+          recorded_at: item.recordedAt.toISOString(),
+        });
+      }
+    }
+
+    // バッチでDB保存（INSERT OR IGNORE）
+    let inserted = 0;
+    if (allData.length > 0) {
+      const batchResult = healthDataRepository.createBatch(allData);
+      inserted = batchResult.inserted;
+    }
+
+    const skipped = allData.length - inserted;
+    console.log(`[Scheduler] Backfill completed: ${inserted}/${allData.length} records inserted (${skipped} duplicates)`);
+
+    return {
+      totalFetched: allData.length,
+      inserted,
+      skipped,
+      errors,
+    };
+  }
+
+  /**
+   * 日次レポートを生成（データ補完付き）
    */
   async runDailyReport(): Promise<void> {
     console.log('[Scheduler] Starting daily report generation...');
@@ -172,7 +297,11 @@ export class Scheduler {
     periodStart.setDate(periodStart.getDate() - 1);
 
     try {
-      // 1. 日次レポート生成
+      // 1. データ補完: 1日分のデータを全プラグインから再取得
+      const backfillResult = await this.runDataBackfill(periodStart, periodEnd);
+      console.log(`[Scheduler] Daily backfill: ${backfillResult.inserted} new records`);
+
+      // 2. 日次レポート生成
       const content = await agentService.generateReport({
         reportType: 'daily',
         periodStart,
@@ -188,7 +317,7 @@ export class Scheduler {
 
       console.log(`[Scheduler] Daily report generated: id=${report.id}`);
 
-      // 2. 通知イベント発火（report:daily）
+      // 3. 通知イベント発火（report:daily）
       await this.publishEvent({
         type: 'report:daily',
         timestamp: new Date(),
@@ -232,6 +361,13 @@ export class Scheduler {
     } else {
       return `0 */${hours} * * *`;
     }
+  }
+
+  /**
+   * プラグインの収集状態を取得
+   */
+  getPluginStates() {
+    return pluginCollectionStateRepository.getAll();
   }
 
   async stop(): Promise<void> {

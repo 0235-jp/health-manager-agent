@@ -1,7 +1,8 @@
 import type { ReactElement, ChangeEvent, FormEvent } from 'react';
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { api, schedulerApi } from '../lib/api';
+import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
 import type { Plugin, PluginType, ConfigField } from '../types';
 
 type TabType = 'all' | PluginType;
@@ -101,6 +102,29 @@ function ConfigForm({ plugin, onSave, onCancel, isSaving }: ConfigFormProps): Re
             ))}
           </select>
         );
+      case 'multiselect':
+        return (
+          <div className="space-y-2 border rounded-md p-3 bg-gray-50">
+            {field.options?.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={((formData[key] as string[]) || []).includes(opt.value)}
+                  onChange={(e) => {
+                    const current = (formData[key] as string[]) || [];
+                    const updated = e.target.checked
+                      ? [...current, opt.value]
+                      : current.filter((v) => v !== opt.value);
+                    handleChange(key, updated);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  disabled={isSaving}
+                />
+                <span className="text-sm text-gray-700">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        );
       default:
         return null;
     }
@@ -154,7 +178,6 @@ interface PluginCardProps {
   onFetch?: () => void;
   isToggling: boolean;
   isTesting: boolean;
-  isFetching?: boolean;
   isCurrentAgent?: boolean;
   onSetCurrentAgent?: () => void;
 }
@@ -168,7 +191,6 @@ function PluginCard({
   onFetch,
   isToggling,
   isTesting,
-  isFetching,
   isCurrentAgent,
   onSetCurrentAgent,
 }: PluginCardProps): ReactElement {
@@ -272,10 +294,9 @@ function PluginCard({
         {plugin.type === 'data-source' && plugin.isLoaded && plugin.isActive && onFetch && (
           <button
             onClick={onFetch}
-            disabled={isFetching}
-            className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
           >
-            {isFetching ? '取得中...' : 'データ取得'}
+            データ取得
           </button>
         )}
         {plugin.type === 'agent' && plugin.isLoaded && !isCurrentAgent && onSetCurrentAgent && (
@@ -331,13 +352,137 @@ function ConfigModal({ plugin, onClose, onSave, isSaving }: ConfigModalProps): R
   );
 }
 
+interface FetchModalProps {
+  plugin: Plugin;
+  onClose: () => void;
+}
+
+function FetchModal({ plugin, onClose }: FetchModalProps): ReactElement {
+  const queryClient = useQueryClient();
+  const [startDate, setStartDate] = useState(() => formatDateForInput(getDateDaysAgo(7)));
+  const [endDate, setEndDate] = useState(() => formatDateForInput(new Date()));
+
+  const { data: status } = useQuery({
+    queryKey: ['scheduler-status'],
+    queryFn: schedulerApi.getStatus,
+  });
+
+  const backfillMutation = useMutation({
+    mutationFn: schedulerApi.runBackfill,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['health-data'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduler-status'] });
+    },
+  });
+
+  const pluginStatus = status?.plugins.find((p) => p.pluginName === plugin.name);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (startDate && endDate) {
+      backfillMutation.mutate({
+        startDate,
+        endDate,
+        pluginNames: [plugin.name],
+      });
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose}></div>
+        <div className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+          <div className="bg-white px-4 pb-4 pt-5 sm:p-6">
+            <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+              {plugin.displayName} からデータ取得
+            </h3>
+
+            {pluginStatus && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-md text-sm">
+                <p className="text-gray-600">
+                  最終成功:{' '}
+                  {pluginStatus.lastSuccessTime
+                    ? new Date(pluginStatus.lastSuccessTime).toLocaleString('ja-JP')
+                    : '未取得'}
+                </p>
+                {pluginStatus.consecutiveFailures > 0 && (
+                  <p className="text-red-600">
+                    連続失敗回数: {pluginStatus.consecutiveFailures}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  開始日
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  終了日
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  required
+                />
+              </div>
+
+              {backfillMutation.isSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+                  取得完了: {backfillMutation.data.inserted}件追加 / {backfillMutation.data.skipped}件スキップ
+                </div>
+              )}
+
+              {backfillMutation.isError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                  エラー: {(backfillMutation.error as Error).message}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={backfillMutation.isPending || !startDate || !endDate}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {backfillMutation.isPending ? '取得中...' : 'データ取得'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
+                >
+                  閉じる
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Plugins(): ReactElement {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [configuringPlugin, setConfiguringPlugin] = useState<Plugin | null>(null);
+  const [fetchingPlugin, setFetchingPlugin] = useState<Plugin | null>(null);
   const [testResult, setTestResult] = useState<{ name: string; success: boolean; message?: string } | null>(null);
-  const [fetchResult, setFetchResult] = useState<{ name: string; count: number; errors?: string[] } | null>(null);
 
   const { data: plugins = [], isLoading } = useQuery({
     queryKey: ['plugins'],
@@ -375,19 +520,6 @@ export function Plugins(): ReactElement {
     onError: (error, name) => {
       setTestResult({ name, success: false, message: (error as Error).message });
       setTimeout(() => setTestResult(null), 5000);
-    },
-  });
-
-  const fetchMutation = useMutation({
-    mutationFn: (name: string) => api.plugins.fetch(name, {}),
-    onSuccess: (result, name) => {
-      setFetchResult({ name, count: result.data.length, errors: result.errors });
-      queryClient.invalidateQueries({ queryKey: ['health-data'] });
-      setTimeout(() => setFetchResult(null), 5000);
-    },
-    onError: (error, name) => {
-      setFetchResult({ name, count: 0, errors: [(error as Error).message] });
-      setTimeout(() => setFetchResult(null), 5000);
     },
   });
 
@@ -478,17 +610,6 @@ export function Plugins(): ReactElement {
         </div>
       )}
 
-      {fetchResult && (
-        <div className={`p-4 rounded-md border ${fetchResult.errors && fetchResult.errors.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
-          <p className={`text-sm ${fetchResult.errors && fetchResult.errors.length > 0 ? 'text-yellow-700' : 'text-green-700'}`}>
-            {fetchResult.name}: {fetchResult.count}件のデータを取得しました
-            {fetchResult.errors && fetchResult.errors.length > 0 && (
-              <span className="block mt-1">警告: {fetchResult.errors.join(', ')}</span>
-            )}
-          </p>
-        </div>
-      )}
-
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           {TABS.map((tab) => (
@@ -533,10 +654,9 @@ export function Plugins(): ReactElement {
               onConfigure={() => setConfiguringPlugin(plugin)}
               onTest={() => testMutation.mutate(plugin.name)}
               onUninstall={() => uninstallMutation.mutate(plugin.name)}
-              onFetch={plugin.type === 'data-source' ? () => fetchMutation.mutate(plugin.name) : undefined}
+              onFetch={plugin.type === 'data-source' ? () => setFetchingPlugin(plugin) : undefined}
               isToggling={toggleMutation.isPending && toggleMutation.variables?.name === plugin.name}
               isTesting={testMutation.isPending && testMutation.variables === plugin.name}
-              isFetching={fetchMutation.isPending && fetchMutation.variables === plugin.name}
               isCurrentAgent={plugin.type === 'agent' && currentAgent?.name === plugin.name}
               onSetCurrentAgent={plugin.type === 'agent' ? () => setCurrentAgentMutation.mutate(plugin.name) : undefined}
             />
@@ -550,6 +670,13 @@ export function Plugins(): ReactElement {
           onClose={() => setConfiguringPlugin(null)}
           onSave={(config) => configMutation.mutate({ name: configuringPlugin.name, config })}
           isSaving={configMutation.isPending}
+        />
+      )}
+
+      {fetchingPlugin && (
+        <FetchModal
+          plugin={fetchingPlugin}
+          onClose={() => setFetchingPlugin(null)}
         />
       )}
     </div>
