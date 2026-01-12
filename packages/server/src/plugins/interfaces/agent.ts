@@ -68,6 +68,39 @@ export interface ReportChunk {
 }
 
 /**
+ * チャットメッセージ
+ */
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/**
+ * チャットパラメータ
+ */
+export interface ChatParams {
+  /** ユーザーメッセージ */
+  message: string;
+  /** 会話履歴（プラグインによっては無視） */
+  history: ChatMessage[];
+  /** セッションID（プラグインによっては無視） */
+  sessionId?: string;
+  /** カスタム指示 */
+  customInstructions?: Array<{
+    instruction: string;
+    priority: number;
+  }>;
+}
+
+/**
+ * チャット結果
+ */
+export interface ChatResult {
+  /** セッションID（継続用） */
+  sessionId: string;
+}
+
+/**
  * AgentPluginインターフェース
  * 既存のAgentAdapterと互換性を持たせる
  */
@@ -90,6 +123,12 @@ export interface AgentPlugin extends BasePlugin {
   generateReportStream?(
     params: GenerateReportParams
   ): AsyncGenerator<ReportChunk, void, unknown>;
+
+  /**
+   * ストリーミングチャット（オプション）
+   * テキストチャンクを yield し、最後に ChatResult を返す
+   */
+  chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
 }
 
 /**

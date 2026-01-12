@@ -34,6 +34,9 @@ export type {
   GenerateReportParams,
   ReportContent,
   ReportChunk,
+  ChatMessage,
+  ChatParams,
+  ChatResult,
   AgentPlugin,
 } from './agent.js';
 export { isAgentPlugin } from './agent.js';

@@ -50,12 +50,32 @@ interface ReportContent {
   recommendations: string[];
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatParams {
+  message: string;
+  history: ChatMessage[];
+  sessionId?: string;
+  customInstructions?: Array<{
+    instruction: string;
+    priority: number;
+  }>;
+}
+
+interface ChatResult {
+  sessionId: string;
+}
+
 interface AgentPlugin {
   readonly manifest: AgentManifest;
   readonly name: string;
   initialize(config: Record<string, unknown>): Promise<void>;
   dispose(): Promise<void>;
   generateReport(params: GenerateReportParams): Promise<ReportContent>;
+  chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
 }
 
 type ToolInput = Record<string, unknown>;
@@ -65,7 +85,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.resolve(__dirname, '..', 'manifest.json');
 
 // Tools available for health data analysis
-const AVAILABLE_TOOLS = ['Bash', 'Skill'] as const;
+const AVAILABLE_TOOLS = ['Bash', 'Skill', 'WebSearch', 'WebFetch'] as const;
 
 const REPORT_SCHEMA = {
   type: 'object',
@@ -90,6 +110,20 @@ const REPORT_SCHEMA = {
 } as const;
 
 /**
+ * カスタム指示を優先度順にソートしてフォーマット
+ */
+function formatCustomInstructions(
+  customInstructions: Array<{ instruction: string; priority: number }>
+): string {
+  if (customInstructions.length === 0) return '';
+
+  const sorted = [...customInstructions].sort((a, b) => b.priority - a.priority);
+  const list = sorted.map((inst) => `- ${inst.instruction}`).join('\n');
+
+  return `\n## ユーザーからの特別な指示\n以下の点に特に注意してください：\n${list}\n`;
+}
+
+/**
  * システムプロンプトを構築
  */
 function buildSystemPrompt(
@@ -99,7 +133,7 @@ function buildSystemPrompt(
 ): string {
   const reportTypeLabel = reportType === 'daily' ? '日次' : '定期';
 
-  let prompt = `あなたはヘルスデータアナリストです。
+  const basePrompt = `あなたはヘルスデータアナリストです。
 ユーザーのヘルスデータを分析し、${reportTypeLabel}評価レポートを作成してください。
 
 ## サーバー情報
@@ -124,18 +158,7 @@ SERVER_BASE_URL: ${serverBaseUrl}
 }
 `;
 
-  const sortedInstructions = [...customInstructions].sort(
-    (a, b) => b.priority - a.priority
-  );
-
-  if (sortedInstructions.length > 0) {
-    const instructionsList = sortedInstructions
-      .map((inst) => `- ${inst.instruction}`)
-      .join('\n');
-    prompt += `\n\n## ユーザーからの特別な指示\n以下の点に特に注意してください：\n${instructionsList}\n`;
-  }
-
-  return prompt;
+  return basePrompt + formatCustomInstructions(customInstructions);
 }
 
 /**
@@ -143,6 +166,28 @@ SERVER_BASE_URL: ${serverBaseUrl}
  */
 function buildUserPrompt(periodStart: Date, periodEnd: Date): string {
   return `${periodStart.toISOString()}から${periodEnd.toISOString()}までのヘルスデータを分析し、評価レポートを作成してください。`;
+}
+
+/**
+ * チャット用システムプロンプトを構築
+ */
+function buildChatSystemPrompt(
+  customInstructions: Array<{ instruction: string; priority: number }>,
+  serverBaseUrl: string
+): string {
+  const basePrompt = `あなたは健康管理アシスタントです。
+ユーザーの健康データに基づいてアドバイスを提供します。
+
+## サーバー情報
+SERVER_BASE_URL: ${serverBaseUrl}
+
+ユーザーの質問に答えるために必要なデータは、get-health-data スキルを使用して取得してください。
+データを取得する際は、必要に応じて日付範囲を指定してください。
+
+ユーザーに対して親切で分かりやすい日本語で回答してください。
+`;
+
+  return basePrompt + formatCustomInstructions(customInstructions);
 }
 
 /**
@@ -196,7 +241,8 @@ class ClaudeAgentPlugin implements AgentPlugin {
     toolName: string,
     input: ToolInput
   ): Promise<PermissionResult> => {
-    if (toolName === 'Skill') {
+    // Skill, WebSearch, WebFetch は無条件許可
+    if (toolName === 'Skill' || toolName === 'WebSearch' || toolName === 'WebFetch') {
       return { behavior: 'allow', updatedInput: input };
     }
 
@@ -223,11 +269,9 @@ class ClaudeAgentPlugin implements AgentPlugin {
   };
 
   async generateReport(params: GenerateReportParams): Promise<ReportContent> {
-    const customInstructions = params.customInstructions || [];
-
     const systemPrompt = buildSystemPrompt(
       params.reportType,
-      customInstructions,
+      params.customInstructions || [],
       this.serverBaseUrl
     );
     const userPrompt = buildUserPrompt(params.periodStart, params.periodEnd);
@@ -235,12 +279,8 @@ class ClaudeAgentPlugin implements AgentPlugin {
     const q = query({
       prompt: userPrompt,
       options: {
-        cwd: this.projectRoot,
+        ...this.getBaseQueryOptions(),
         systemPrompt,
-        settingSources: ['project'],
-        model: this.model,
-        tools: [...AVAILABLE_TOOLS],
-        canUseTool: this.canUseTool,
         outputFormat: { type: 'json_schema', schema: REPORT_SCHEMA },
         persistSession: false,
       },
@@ -276,6 +316,65 @@ class ClaudeAgentPlugin implements AgentPlugin {
       risks: [],
       recommendations: [],
     };
+  }
+
+  /**
+   * 共通のクエリオプションを取得
+   */
+  private getBaseQueryOptions() {
+    return {
+      cwd: this.projectRoot,
+      settingSources: ['project'] as ('project' | 'user')[],
+      model: this.model,
+      tools: [...AVAILABLE_TOOLS],
+      canUseTool: this.canUseTool,
+    };
+  }
+
+  /**
+   * ストリーミングチャット
+   * Claude Agent SDK のセッション機能を使用して会話を継続
+   */
+  async *chat(params: ChatParams): AsyncGenerator<string, ChatResult, unknown> {
+    const baseOptions = this.getBaseQueryOptions();
+
+    // セッションIDがある場合は再開、なければ新規セッション
+    const queryOptions = params.sessionId
+      ? { ...baseOptions, resume: params.sessionId }
+      : {
+          ...baseOptions,
+          systemPrompt: buildChatSystemPrompt(params.customInstructions || [], this.serverBaseUrl),
+          persistSession: true,
+        };
+
+    const q = query({ prompt: params.message, options: queryOptions });
+    let sessionId = params.sessionId || '';
+
+    for await (const message of q) {
+      // 初期化メッセージからセッションIDを取得
+      if (message.type === 'system' && message.subtype === 'init') {
+        sessionId = (message as { session_id?: string }).session_id || sessionId;
+      }
+
+      // アシスタントのテキストメッセージをストリーミング
+      if (message.type === 'assistant' && message.message) {
+        const content = message.message.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text) {
+              yield block.text;
+            }
+          }
+        }
+      }
+
+      // エラー処理
+      if (message.type === 'result' && message.subtype.startsWith('error_')) {
+        throw new Error(`Agent error: ${message.subtype}`);
+      }
+    }
+
+    return { sessionId };
   }
 }
 

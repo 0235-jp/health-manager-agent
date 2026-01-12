@@ -167,3 +167,18 @@ export interface DataType {
   is_standard: boolean;
   plugin_name: string | null;
 }
+
+// Chat types
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+export interface ChatStreamEvent {
+  type: 'text' | 'done' | 'error';
+  content?: string;
+  session_id?: string;
+  message?: string;
+}

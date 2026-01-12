@@ -7,6 +7,7 @@ import { dataTypesRouter } from './data-types.js';
 import { reportsRouter } from './reports.js';
 import { pluginsRouter } from './plugins.js';
 import { schedulerRouter } from './scheduler.js';
+import { chatRouter } from './chat.js';
 
 export const router = Router();
 
@@ -18,3 +19,4 @@ router.use('/data-types', dataTypesRouter);
 router.use('/reports', reportsRouter);
 router.use('/plugins', pluginsRouter);
 router.use('/scheduler', schedulerRouter);
+router.use('/chat', chatRouter);

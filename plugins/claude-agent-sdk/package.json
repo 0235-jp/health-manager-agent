@@ -1,6 +1,6 @@
 {
   "name": "@health-manager/claude-agent-sdk",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Claude Agent SDK Plugin for Health Manager",
   "main": "dist/index.js",
   "type": "module",

@@ -15,6 +15,8 @@ import type {
   PluginInstallResult,
   FetchResult,
   DataType,
+  ChatMessage,
+  ChatStreamEvent,
 } from '../types';
 
 const API_BASE = '/api';
@@ -264,7 +266,84 @@ export const api = {
       return fetchJson('/data-types');
     },
   },
+
+  chat: {
+    /**
+     * ストリーミングチャットを実行
+     */
+    async stream(
+      message: string,
+      history: ChatMessage[],
+      sessionId: string | null,
+      onChunk: (text: string) => void,
+      onDone: (sessionId: string) => void,
+      onError: (error: string) => void
+    ): Promise<void> {
+      const response = await fetch(`${API_BASE}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          history: history.map((m) => ({ role: m.role, content: m.content })),
+          session_id: sessionId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Chat request failed');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+
+            const event = parseSSEData(line.slice(6));
+            if (!event) continue;
+
+            switch (event.type) {
+              case 'text':
+                if (event.content) onChunk(event.content);
+                break;
+              case 'done':
+                onDone(event.session_id || '');
+                break;
+              case 'error':
+                onError(event.message || 'Unknown error');
+                break;
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  },
 };
+
+function parseSSEData(jsonStr: string): ChatStreamEvent | null {
+  try {
+    return JSON.parse(jsonStr) as ChatStreamEvent;
+  } catch {
+    return null;
+  }
+}
 
 // Scheduler API types
 

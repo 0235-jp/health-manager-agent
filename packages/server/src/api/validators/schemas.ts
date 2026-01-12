@@ -39,6 +39,18 @@ export const generateReportSchema = z.object({
   target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+// チャット用スキーマ
+export const chatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+});
+
+export const chatRequestSchema = z.object({
+  message: z.string().min(1).max(10000),
+  history: z.array(chatMessageSchema).default([]),
+  session_id: z.string().nullish(),
+});
+
 export type HealthDataQuery = z.infer<typeof healthDataQuerySchema>;
 export type HealthDataCreate = z.infer<typeof healthDataCreateSchema>;
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;
@@ -46,3 +58,5 @@ export type CustomInstructionCreate = z.infer<typeof customInstructionCreateSche
 export type CustomInstructionUpdate = z.infer<typeof customInstructionUpdateSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 export type GenerateReport = z.infer<typeof generateReportSchema>;
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type ChatRequest = z.infer<typeof chatRequestSchema>;

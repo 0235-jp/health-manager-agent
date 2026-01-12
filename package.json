@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
+    "dev": "concurrently -n server,frontend -c blue,green \"npm run dev:server\" \"npm run dev:frontend\"",
     "dev:server": "npm run dev -w packages/server",
     "dev:frontend": "npm run dev -w packages/frontend",
     "build": "npm run build --workspaces --if-present",
@@ -14,6 +14,7 @@
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "typescript": "^5.3.3"
   }
 }

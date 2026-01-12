@@ -13,7 +13,18 @@ export function Markdown({ children, className = '' }: MarkdownProps): ReactElem
 
   return (
     <div className={combinedClassName}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {children}
+      </ReactMarkdown>
     </div>
   );
 }
