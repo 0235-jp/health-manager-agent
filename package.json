@@ -9,6 +9,13 @@
     "dev": "concurrently -n server,frontend -c blue,green \"npm run dev:server\" \"npm run dev:frontend\"",
     "dev:server": "npm run dev -w packages/server",
     "dev:frontend": "npm run dev -w packages/frontend",
+    "dev:bg": "npm run dev:bg:server && npm run dev:bg:frontend && echo 'Started in background. Logs: logs/'",
+    "dev:bg:server": "mkdir -p logs && nohup npm run dev:server > logs/server.log 2>&1 &",
+    "dev:bg:frontend": "mkdir -p logs && nohup npm run dev:frontend > logs/frontend.log 2>&1 &",
+    "dev:stop": "lsof -ti:3001 | xargs -r kill -9; lsof -ti:5173 | xargs -r kill -9; echo 'Stopped'",
+    "dev:logs": "tail -f logs/server.log logs/frontend.log",
+    "dev:logs:server": "tail -f logs/server.log",
+    "dev:logs:frontend": "tail -f logs/frontend.log",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"

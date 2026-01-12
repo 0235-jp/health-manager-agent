@@ -34,29 +34,38 @@ export interface DataCollectionResult {
 export class Scheduler {
   private dataCollectionJob: cron.ScheduledTask | null = null;
   private dailyReportJob: cron.ScheduledTask | null = null;
+  private static DEFAULT_TIMEZONE = 'Asia/Tokyo';
 
   async start(): Promise<void> {
-    // データ収集ジョブ（設定から間隔を取得）
     const settings = settingsRepository.getAll();
     const intervalSeconds = (settings.collection_interval as number) || 3600;
+    const timezone = (settings.timezone as string) || Scheduler.DEFAULT_TIMEZONE;
     const cronExpression = this.secondsToCron(intervalSeconds);
 
-    this.dataCollectionJob = cron.schedule(cronExpression, () => {
-      this.runDataCollection().catch((error) => {
-        console.error('[Scheduler] Failed to collect data:', error);
-      });
-    });
+    this.dataCollectionJob = cron.schedule(
+      cronExpression,
+      () => {
+        this.runDataCollection().catch((error) => {
+          console.error('[Scheduler] Failed to collect data:', error);
+        });
+      },
+      { timezone }
+    );
 
-    console.log(`[Scheduler] Data collection job scheduled: ${cronExpression}`);
+    console.log(`[Scheduler] Data collection job scheduled: ${cronExpression} (timezone: ${timezone})`);
 
     // 日次レポートジョブ（毎日0:05）
-    this.dailyReportJob = cron.schedule('5 0 * * *', () => {
-      this.runDailyReport().catch((error) => {
-        console.error('[Scheduler] Failed to generate daily report:', error);
-      });
-    });
+    this.dailyReportJob = cron.schedule(
+      '5 0 * * *',
+      () => {
+        this.runDailyReport().catch((error) => {
+          console.error('[Scheduler] Failed to generate daily report:', error);
+        });
+      },
+      { timezone }
+    );
 
-    console.log('[Scheduler] Daily report job scheduled at 00:05');
+    console.log(`[Scheduler] Daily report job scheduled at 00:05 (timezone: ${timezone})`);
   }
 
   /**
@@ -382,6 +391,12 @@ export class Scheduler {
     }
 
     console.log('[Scheduler] Stopped');
+  }
+
+  async restart(): Promise<void> {
+    await this.stop();
+    await this.start();
+    console.log('[Scheduler] Restarted with new settings');
   }
 }
 

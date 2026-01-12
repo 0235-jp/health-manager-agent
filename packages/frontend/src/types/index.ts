@@ -20,6 +20,7 @@ export interface PaginatedResponse<T> {
 
 export interface Settings {
   collection_interval: number;
+  timezone: string;
   active_plugins: string[];
   data_source_priority: Record<string, string>;
 }

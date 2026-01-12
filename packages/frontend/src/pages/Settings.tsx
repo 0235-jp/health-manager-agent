@@ -7,11 +7,24 @@ import type { CustomInstruction } from '../types';
 
 interface SettingsFormData {
   collection_interval: number;
+  timezone: string;
 }
 
 const DEFAULT_FORM_DATA: SettingsFormData = {
   collection_interval: 3600,
+  timezone: 'Asia/Tokyo',
 };
+
+const TIMEZONE_OPTIONS = [
+  { value: 'Asia/Tokyo', label: '日本標準時 (JST)' },
+  { value: 'Asia/Seoul', label: '韓国標準時 (KST)' },
+  { value: 'Asia/Shanghai', label: '中国標準時 (CST)' },
+  { value: 'Asia/Singapore', label: 'シンガポール標準時 (SGT)' },
+  { value: 'America/Los_Angeles', label: '太平洋標準時 (PST/PDT)' },
+  { value: 'America/New_York', label: '東部標準時 (EST/EDT)' },
+  { value: 'Europe/London', label: 'イギリス標準時 (GMT/BST)' },
+  { value: 'UTC', label: '協定世界時 (UTC)' },
+];
 
 const INTERVAL_OPTIONS = [
   { value: 1800, label: '30分' },
@@ -382,6 +395,7 @@ export function Settings(): ReactElement {
     if (settings) {
       setFormData({
         collection_interval: settings.collection_interval || DEFAULT_FORM_DATA.collection_interval,
+        timezone: settings.timezone || DEFAULT_FORM_DATA.timezone,
       });
     }
   }, [settings]);
@@ -416,23 +430,44 @@ export function Settings(): ReactElement {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-lg font-medium text-gray-800">データ収集</h3>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              収集間隔
-            </label>
-            <select
-              value={formData.collection_interval}
-              onChange={(e) =>
-                updateField('collection_interval', parseInt(e.target.value, 10))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            >
-              {INTERVAL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                収集間隔
+              </label>
+              <select
+                value={formData.collection_interval}
+                onChange={(e) =>
+                  updateField('collection_interval', parseInt(e.target.value, 10))
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                タイムゾーン
+              </label>
+              <select
+                value={formData.timezone}
+                onChange={(e) => updateField('timezone', e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                {TIMEZONE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                日次レポートの生成時刻や、レポート内の時間表記に使用されます
+              </p>
+            </div>
           </div>
         </div>
 

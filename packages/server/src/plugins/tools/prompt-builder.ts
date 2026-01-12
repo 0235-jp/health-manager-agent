@@ -3,6 +3,9 @@
  */
 
 import type { ToolExecutor, ToolDefinition } from './interfaces.js';
+import { settingsRepository } from '../../db/repositories/settings.js';
+
+const DEFAULT_TIMEZONE = 'Asia/Tokyo';
 
 /**
  * Custom instruction for prompts
@@ -96,7 +99,23 @@ ${dataAccessInstructions}
   }
 
   buildReportUserPrompt(params: ReportPromptParams): string {
-    return `${params.periodStart.toISOString()}から${params.periodEnd.toISOString()}までのヘルスデータを分析し、評価レポートを作成してください。`;
+    const settings = settingsRepository.getAll();
+    const timezone = (settings.timezone as string) || DEFAULT_TIMEZONE;
+    const startStr = this.formatDateForDisplay(params.periodStart, timezone);
+    const endStr = this.formatDateForDisplay(params.periodEnd, timezone);
+    return `${startStr}から${endStr}までのヘルスデータを分析し、評価レポートを作成してください。`;
+  }
+
+  private formatDateForDisplay(date: Date, timezone: string): string {
+    const formatted = date.toLocaleString('ja-JP', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${formatted} (${timezone})`;
   }
 
   buildChatSystemPrompt(params: ChatPromptParams, useSkills: boolean): string {
