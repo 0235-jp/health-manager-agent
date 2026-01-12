@@ -12,6 +12,8 @@ export interface AgentCapabilities {
   functionCalling?: boolean;
   structuredOutput?: boolean;
   vision?: boolean;
+  /** Claude Agent SDK の Skill ツールをサポートするか */
+  skills?: boolean;
 }
 
 /**

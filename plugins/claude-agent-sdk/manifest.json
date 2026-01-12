@@ -12,7 +12,8 @@
     "streaming": false,
     "functionCalling": true,
     "structuredOutput": true,
-    "vision": false
+    "vision": false,
+    "skills": true
   },
   "configSchema": {
     "model": {

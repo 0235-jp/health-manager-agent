@@ -2,6 +2,8 @@
  * プラグインシステム - 基底インターフェース
  */
 
+import type { ToolExecutor, PromptBuilder } from '../tools/index.js';
+
 export type PluginType = 'data-source' | 'agent' | 'notification';
 
 /**
@@ -48,6 +50,20 @@ export interface ValidationResult {
 }
 
 /**
+ * プラグイン初期化コンテキスト
+ */
+export interface PluginContext {
+  /** ユーザー設定 */
+  config: Record<string, unknown>;
+  /** ツール実行器（agentプラグインのみ） */
+  toolExecutor?: ToolExecutor;
+  /** プロンプトビルダー（agentプラグインのみ） */
+  promptBuilder?: PromptBuilder;
+  /** Skills対応かどうか（agentプラグインのみ） */
+  useSkills?: boolean;
+}
+
+/**
  * 基底プラグインインターフェース
  */
 export interface BasePlugin {
@@ -55,9 +71,9 @@ export interface BasePlugin {
 
   /**
    * プラグインの初期化
-   * @param config 設定値
+   * @param context 初期化コンテキスト（設定値とオプションの依存関係）
    */
-  initialize(config: Record<string, unknown>): Promise<void>;
+  initialize(context: PluginContext): Promise<void>;
 
   /**
    * リソースの解放

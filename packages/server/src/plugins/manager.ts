@@ -7,16 +7,20 @@ import { PluginLoader, type LoadedPlugin } from './loader.js';
 import { PluginRegistry, type PluginState } from './registry.js';
 import { EventBus } from './event-bus.js';
 import type {
+  AgentManifest,
   AgentPlugin,
   FetchOptions,
   HealthDataInput,
   NotificationEvent,
   NotificationPlugin,
   PerPluginFetchOptions,
+  PluginContext,
   PluginFetchResult,
   PluginType,
 } from './interfaces/index.js';
 import { pluginsRepository } from '../db/repositories/plugins.js';
+import { DefaultToolExecutor, DefaultPromptBuilder } from './tools/index.js';
+import type { ToolExecutor, PromptBuilder } from './tools/index.js';
 
 /**
  * プラグインマネージャー
@@ -34,11 +38,21 @@ export class PluginManager {
   private pluginConfigStore: Map<string, Record<string, unknown>> = new Map();
   private pluginUnsubscribers: Map<string, () => void> = new Map();
 
+  // Tool system
+  private toolExecutor: ToolExecutor;
+  private promptBuilder: PromptBuilder;
+  private serverBaseUrl: string;
+
   private constructor(pluginsDir: string) {
     this.pluginsDir = pluginsDir;
     this.loader = new PluginLoader(pluginsDir);
     this.registry = new PluginRegistry();
     this.eventBus = new EventBus();
+
+    // Initialize tool system
+    this.serverBaseUrl = process.env.SERVER_BASE_URL || 'http://localhost:3001';
+    this.toolExecutor = new DefaultToolExecutor();
+    this.promptBuilder = new DefaultPromptBuilder(this.toolExecutor, this.serverBaseUrl);
   }
 
   /**
@@ -98,6 +112,16 @@ export class PluginManager {
           `[PluginManager] Failed to auto-load plugin ${pluginRecord.name}:`,
           error
         );
+      }
+    }
+
+    // DBから保存されたcurrent_agentを復元（agent型プラグインのみ）
+    const savedCurrentAgent = pluginsRepository.getCurrentAgentName();
+    if (savedCurrentAgent) {
+      const state = this.registry.get(savedCurrentAgent);
+      if (state && state.manifest.type === 'agent') {
+        this.currentAgentName = savedCurrentAgent;
+        console.log(`[PluginManager] Restored current agent: ${savedCurrentAgent}`);
       }
     }
 
@@ -196,9 +220,12 @@ export class PluginManager {
     // レジストリに登録
     this.registry.register(instance, savedConfig, true);
 
+    // PluginContextを構築
+    const context = this.buildPluginContext(manifest, savedConfig);
+
     // プラグインを初期化
     try {
-      await instance.initialize(savedConfig);
+      await instance.initialize(context);
       console.log(`[PluginManager] Plugin ${manifest.name} initialized`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -217,6 +244,26 @@ export class PluginManager {
     }
 
     return this.registry.get(manifest.name)!;
+  }
+
+  /**
+   * プラグイン初期化コンテキストを構築
+   */
+  private buildPluginContext(
+    manifest: LoadedPlugin['manifest'],
+    config: Record<string, unknown>
+  ): PluginContext {
+    const context: PluginContext = { config };
+
+    // Agentプラグインの場合、ToolExecutorとPromptBuilderを提供
+    if (manifest.type === 'agent') {
+      const agentManifest = manifest as AgentManifest;
+      context.toolExecutor = this.toolExecutor;
+      context.promptBuilder = this.promptBuilder;
+      context.useSkills = agentManifest.capabilities?.skills ?? false;
+    }
+
+    return context;
   }
 
   /**
@@ -308,6 +355,7 @@ export class PluginManager {
     }
 
     this.currentAgentName = pluginName;
+    pluginsRepository.setCurrentAgentName(pluginName);
     console.log(`[PluginManager] Current agent set to: ${pluginName}`);
   }
 
@@ -333,10 +381,12 @@ export class PluginManager {
     // 更新後の設定を保存（state.configは参照なので既に更新済み）
     this.pluginConfigStore.set(name, state.config);
 
-    // プラグインを再初期化
+    // PluginContextを構築して再初期化
+    const context = this.buildPluginContext(state.manifest, state.config);
+
     try {
       await state.plugin.dispose();
-      await state.plugin.initialize(state.config);
+      await state.plugin.initialize(context);
       this.registry.setError(name, undefined);
       console.log(`[PluginManager] Plugin ${name} reconfigured`);
     } catch (error) {
@@ -518,5 +568,19 @@ export class PluginManager {
    */
   getLoader(): PluginLoader {
     return this.loader;
+  }
+
+  /**
+   * ToolExecutorを取得
+   */
+  getToolExecutor(): ToolExecutor {
+    return this.toolExecutor;
+  }
+
+  /**
+   * PromptBuilderを取得
+   */
+  getPromptBuilder(): PromptBuilder {
+    return this.promptBuilder;
   }
 }

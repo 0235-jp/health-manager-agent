@@ -85,9 +85,17 @@ interface NotificationResult {
   error?: string;
 }
 
+// PluginContext interface (from server package)
+interface PluginContext {
+  config: Record<string, unknown>;
+  toolExecutor?: unknown;
+  promptBuilder?: unknown;
+  useSkills?: boolean;
+}
+
 interface NotificationPlugin {
   readonly manifest: NotificationManifest;
-  initialize(config: Record<string, unknown>): Promise<void>;
+  initialize(context: PluginContext): Promise<void>;
   dispose(): Promise<void>;
   notify(event: NotificationEvent): Promise<NotificationResult>;
   testNotification(): Promise<NotificationResult>;
@@ -112,7 +120,9 @@ class WebhookNotificationPlugin implements NotificationPlugin {
     this.manifest = manifest;
   }
 
-  async initialize(config: Record<string, unknown>): Promise<void> {
+  async initialize(context: PluginContext): Promise<void> {
+    const { config } = context;
+
     // Webhook URLを取得
     if (config.webhookUrl && typeof config.webhookUrl === 'string') {
       this.webhookUrl = config.webhookUrl;

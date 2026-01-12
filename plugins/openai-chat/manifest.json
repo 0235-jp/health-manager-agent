@@ -1,0 +1,39 @@
+{
+  "name": "openai-chat",
+  "displayName": "OpenAI Chat",
+  "version": "1.0.0",
+  "type": "agent",
+  "description": "OpenAI API互換のエージェントプラグイン",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "provider": "openai",
+  "capabilities": {
+    "streaming": true,
+    "functionCalling": true,
+    "structuredOutput": false,
+    "vision": false,
+    "skills": false
+  },
+  "configSchema": {
+    "baseUrl": {
+      "type": "string",
+      "label": "Base URL",
+      "description": "APIエンドポイント（空欄でOpenAI公式）",
+      "required": false,
+      "default": "https://api.openai.com/v1"
+    },
+    "apiKey": {
+      "type": "string",
+      "label": "API Key",
+      "required": true,
+      "secret": true
+    },
+    "model": {
+      "type": "string",
+      "label": "モデル",
+      "description": "使用するモデル名",
+      "required": true,
+      "default": "gpt-4o-mini"
+    }
+  }
+}

@@ -64,9 +64,17 @@ interface ConnectionTestResult {
   message?: string;
 }
 
+// PluginContext interface (from server package)
+interface PluginContext {
+  config: Record<string, unknown>;
+  toolExecutor?: unknown;
+  promptBuilder?: unknown;
+  useSkills?: boolean;
+}
+
 interface DataSourcePlugin {
   readonly manifest: DataSourceManifest;
-  initialize(config: Record<string, unknown>): Promise<void>;
+  initialize(context: PluginContext): Promise<void>;
   dispose(): Promise<void>;
   fetchData(options: FetchOptions): Promise<FetchResult>;
   testConnection(): Promise<ConnectionTestResult>;
@@ -99,7 +107,8 @@ class HuaweiHealthPlugin implements DataSourcePlugin {
     this.onConfigUpdate = callback;
   }
 
-  async initialize(config: Record<string, unknown>): Promise<void> {
+  async initialize(context: PluginContext): Promise<void> {
+    const { config } = context;
     this.config = config;
 
     const clientId = config.clientId as string | undefined;

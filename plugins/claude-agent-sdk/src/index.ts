@@ -25,6 +25,7 @@ interface AgentManifest {
     functionCalling?: boolean;
     structuredOutput?: boolean;
     vision?: boolean;
+    skills?: boolean;
   };
   configSchema?: Record<string, unknown>;
 }
@@ -69,10 +70,25 @@ interface ChatResult {
   sessionId: string;
 }
 
+// PromptBuilder interface (from server package)
+interface PromptBuilder {
+  buildReportSystemPrompt(params: GenerateReportParams, useSkills: boolean): string;
+  buildReportUserPrompt(params: GenerateReportParams): string;
+  buildChatSystemPrompt(params: { customInstructions?: Array<{ instruction: string; priority: number }> }, useSkills: boolean): string;
+}
+
+// PluginContext interface (from server package)
+interface PluginContext {
+  config: Record<string, unknown>;
+  toolExecutor?: unknown;
+  promptBuilder?: PromptBuilder;
+  useSkills?: boolean;
+}
+
 interface AgentPlugin {
   readonly manifest: AgentManifest;
   readonly name: string;
-  initialize(config: Record<string, unknown>): Promise<void>;
+  initialize(context: PluginContext): Promise<void>;
   dispose(): Promise<void>;
   generateReport(params: GenerateReportParams): Promise<ReportContent>;
   chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
@@ -110,87 +126,6 @@ const REPORT_SCHEMA = {
 } as const;
 
 /**
- * カスタム指示を優先度順にソートしてフォーマット
- */
-function formatCustomInstructions(
-  customInstructions: Array<{ instruction: string; priority: number }>
-): string {
-  if (customInstructions.length === 0) return '';
-
-  const sorted = [...customInstructions].sort((a, b) => b.priority - a.priority);
-  const list = sorted.map((inst) => `- ${inst.instruction}`).join('\n');
-
-  return `\n## ユーザーからの特別な指示\n以下の点に特に注意してください：\n${list}\n`;
-}
-
-/**
- * システムプロンプトを構築
- */
-function buildSystemPrompt(
-  reportType: 'on_fetch' | 'daily',
-  customInstructions: Array<{ instruction: string; priority: number }>,
-  serverBaseUrl: string
-): string {
-  const reportTypeLabel = reportType === 'daily' ? '日次' : '定期';
-
-  const basePrompt = `あなたはヘルスデータアナリストです。
-ユーザーのヘルスデータを分析し、${reportTypeLabel}評価レポートを作成してください。
-
-## サーバー情報
-SERVER_BASE_URL: ${serverBaseUrl}
-
-ヘルスデータを取得するには、get-health-data スキルを使用してください。
-
-レポートには以下を含めてください：
-- 全体的な健康状態のサマリー
-- 各指標の現在値とトレンド
-- リスクや注意点
-- 改善のための推奨事項
-
-レポートは以下のJSON形式で出力してください：
-{
-  "summary": "全体サマリー",
-  "metrics": {
-    "metric_name": { "value": 数値, "unit": "単位", "trend": "up|down|stable" }
-  },
-  "risks": ["リスク1", "リスク2"],
-  "recommendations": ["推奨事項1", "推奨事項2"]
-}
-`;
-
-  return basePrompt + formatCustomInstructions(customInstructions);
-}
-
-/**
- * ユーザープロンプトを構築
- */
-function buildUserPrompt(periodStart: Date, periodEnd: Date): string {
-  return `${periodStart.toISOString()}から${periodEnd.toISOString()}までのヘルスデータを分析し、評価レポートを作成してください。`;
-}
-
-/**
- * チャット用システムプロンプトを構築
- */
-function buildChatSystemPrompt(
-  customInstructions: Array<{ instruction: string; priority: number }>,
-  serverBaseUrl: string
-): string {
-  const basePrompt = `あなたは健康管理アシスタントです。
-ユーザーの健康データに基づいてアドバイスを提供します。
-
-## サーバー情報
-SERVER_BASE_URL: ${serverBaseUrl}
-
-ユーザーの質問に答えるために必要なデータは、get-health-data スキルを使用して取得してください。
-データを取得する際は、必要に応じて日付範囲を指定してください。
-
-ユーザーに対して親切で分かりやすい日本語で回答してください。
-`;
-
-  return basePrompt + formatCustomInstructions(customInstructions);
-}
-
-/**
  * Claude Agent SDK Plugin 実装
  */
 class ClaudeAgentPlugin implements AgentPlugin {
@@ -198,8 +133,8 @@ class ClaudeAgentPlugin implements AgentPlugin {
   readonly name = 'claude-agent-sdk';
 
   private projectRoot: string;
-  private serverBaseUrl: string = 'http://localhost:3001';
   private model: string = 'claude-opus-4-5-20251101';
+  private promptBuilder?: PromptBuilder;
 
   constructor(manifest: AgentManifest) {
     this.manifest = manifest;
@@ -207,14 +142,15 @@ class ClaudeAgentPlugin implements AgentPlugin {
     this.projectRoot = path.resolve(__dirname, '..', '..', '..');
   }
 
-  async initialize(config: Record<string, unknown>): Promise<void> {
+  async initialize(context: PluginContext): Promise<void> {
+    const { config } = context;
+
     this.applyStringConfig(config, 'model', (value) => { this.model = value; });
     this.applyStringConfig(config, 'apiKey', (value) => { process.env.ANTHROPIC_API_KEY = value; });
     this.applyStringConfig(config, 'baseUrl', (value) => { process.env.ANTHROPIC_BASE_URL = value; });
 
-    if (process.env.SERVER_BASE_URL) {
-      this.serverBaseUrl = process.env.SERVER_BASE_URL;
-    }
+    // Store promptBuilder from context
+    this.promptBuilder = context.promptBuilder;
 
     console.log(`[ClaudeAgentPlugin] Initialized with model: ${this.model}`);
   }
@@ -257,7 +193,6 @@ class ClaudeAgentPlugin implements AgentPlugin {
     }
 
     const isLocalRequest =
-      command.includes(this.serverBaseUrl) ||
       command.includes('localhost:') ||
       command.includes('127.0.0.1:');
 
@@ -269,12 +204,13 @@ class ClaudeAgentPlugin implements AgentPlugin {
   };
 
   async generateReport(params: GenerateReportParams): Promise<ReportContent> {
-    const systemPrompt = buildSystemPrompt(
-      params.reportType,
-      params.customInstructions || [],
-      this.serverBaseUrl
-    );
-    const userPrompt = buildUserPrompt(params.periodStart, params.periodEnd);
+    if (!this.promptBuilder) {
+      throw new Error('PromptBuilder not initialized');
+    }
+
+    // Use promptBuilder from server (useSkills=true for Claude Agent SDK)
+    const systemPrompt = this.promptBuilder.buildReportSystemPrompt(params, true);
+    const userPrompt = this.promptBuilder.buildReportUserPrompt(params);
 
     const q = query({
       prompt: userPrompt,
@@ -336,14 +272,27 @@ class ClaudeAgentPlugin implements AgentPlugin {
    * Claude Agent SDK のセッション機能を使用して会話を継続
    */
   async *chat(params: ChatParams): AsyncGenerator<string, ChatResult, unknown> {
+    // 新規セッションの場合はpromptBuilderが必須
+    if (!params.sessionId && !this.promptBuilder) {
+      throw new Error('PromptBuilder not initialized');
+    }
+
     const baseOptions = this.getBaseQueryOptions();
+
+    // Build system prompt using promptBuilder (useSkills=true for Claude Agent SDK)
+    const systemPrompt = params.sessionId
+      ? undefined
+      : this.promptBuilder!.buildChatSystemPrompt(
+          { customInstructions: params.customInstructions },
+          true
+        );
 
     // セッションIDがある場合は再開、なければ新規セッション
     const queryOptions = params.sessionId
       ? { ...baseOptions, resume: params.sessionId }
       : {
           ...baseOptions,
-          systemPrompt: buildChatSystemPrompt(params.customInstructions || [], this.serverBaseUrl),
+          systemPrompt,
           persistSession: true,
         };
 

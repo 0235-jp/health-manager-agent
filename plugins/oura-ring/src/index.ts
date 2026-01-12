@@ -68,9 +68,17 @@ interface ConnectionTestResult {
   message?: string;
 }
 
+// PluginContext interface (from server package)
+interface PluginContext {
+  config: Record<string, unknown>;
+  toolExecutor?: unknown;
+  promptBuilder?: unknown;
+  useSkills?: boolean;
+}
+
 interface DataSourcePlugin {
   readonly manifest: DataSourceManifest;
-  initialize(config: Record<string, unknown>): Promise<void>;
+  initialize(context: PluginContext): Promise<void>;
   dispose(): Promise<void>;
   fetchData(options: FetchOptions): Promise<FetchResult>;
   testConnection(): Promise<ConnectionTestResult>;
@@ -93,7 +101,8 @@ class OuraRingPlugin implements DataSourcePlugin {
     this.manifest = manifest;
   }
 
-  async initialize(config: Record<string, unknown>): Promise<void> {
+  async initialize(context: PluginContext): Promise<void> {
+    const { config } = context;
     if (config.accessToken && typeof config.accessToken === 'string') {
       this.accessToken = config.accessToken;
       this.client = new OuraApiClient({ accessToken: this.accessToken });

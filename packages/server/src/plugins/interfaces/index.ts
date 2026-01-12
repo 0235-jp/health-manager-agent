@@ -9,9 +9,21 @@ export type {
   ConfigSchema,
   PluginManifest,
   ValidationResult,
+  PluginContext,
   BasePlugin,
   PluginFactory,
 } from './base.js';
+
+// Tool system
+export type {
+  ToolDefinition,
+  ToolResult,
+  ToolExecutor,
+  PromptBuilder,
+  ReportPromptParams,
+  ChatPromptParams,
+  CustomInstruction,
+} from '../tools/index.js';
 
 // DataSourcePlugin
 export type {
