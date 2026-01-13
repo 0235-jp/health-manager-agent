@@ -62,14 +62,6 @@ export interface ReportContent {
 }
 
 /**
- * ストリーミング用のチャンク
- */
-export interface ReportChunk {
-  type: 'text' | 'metrics' | 'complete';
-  content: string | Partial<ReportContent>;
-}
-
-/**
  * チャットメッセージ
  */
 export interface ChatMessage {
@@ -118,13 +110,6 @@ export interface AgentPlugin extends BasePlugin {
    * レポート生成
    */
   generateReport(params: GenerateReportParams): Promise<ReportContent>;
-
-  /**
-   * ストリーミングレポート生成（オプション）
-   */
-  generateReportStream?(
-    params: GenerateReportParams
-  ): AsyncGenerator<ReportChunk, void, unknown>;
 
   /**
    * ストリーミングチャット（オプション）

@@ -10,7 +10,6 @@
   "supportedEvents": [
     "report:generated",
     "report:daily",
-    "health:alert",
     "data:fetched"
   ],
   "deliveryMethod": "push",
@@ -28,10 +27,9 @@
       "options": [
         { "value": "report:daily", "label": "日次レポート" },
         { "value": "report:generated", "label": "取得時レポート" },
-        { "value": "health:alert", "label": "ヘルスアラート" },
         { "value": "data:fetched", "label": "データ取得完了" }
       ],
-      "default": ["report:daily", "health:alert"]
+      "default": ["report:daily"]
     },
     "includeFullReport": {
       "type": "boolean",

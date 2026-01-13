@@ -25,9 +25,7 @@ interface NotificationManifest {
 type NotificationEventType =
   | 'report:generated'
   | 'report:daily'
-  | 'health:alert'
-  | 'data:fetched'
-  | 'system:error';
+  | 'data:fetched';
 
 interface ReportContent {
   summary: string;
@@ -48,30 +46,13 @@ interface ReportGeneratedPayload {
   periodEnd: Date;
 }
 
-interface HealthAlertPayload {
-  alertType: string;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  relatedData?: Record<string, unknown>;
-}
-
 interface DataFetchedPayload {
   sourceName: string;
   recordCount: number;
   dataTypes: string[];
 }
 
-interface SystemErrorPayload {
-  error: string;
-  stack?: string;
-  context?: Record<string, unknown>;
-}
-
-type NotificationPayload =
-  | ReportGeneratedPayload
-  | HealthAlertPayload
-  | DataFetchedPayload
-  | SystemErrorPayload;
+type NotificationPayload = ReportGeneratedPayload | DataFetchedPayload;
 
 interface NotificationEvent {
   type: NotificationEventType;
@@ -132,8 +113,8 @@ class WebhookNotificationPlugin implements NotificationPlugin {
     if (config.enabledEvents && Array.isArray(config.enabledEvents)) {
       this.enabledEvents = new Set(config.enabledEvents as NotificationEventType[]);
     } else {
-      // デフォルト: 日次レポートとアラート
-      this.enabledEvents = new Set(['report:daily', 'health:alert']);
+      // デフォルト: 日次レポート
+      this.enabledEvents = new Set(['report:daily']);
     }
 
     // フルレポートを含めるか
@@ -259,24 +240,9 @@ class WebhookNotificationPlugin implements NotificationPlugin {
         return `📊 ${typeLabel}が生成されました\n\n${payload.content.summary}`;
       }
 
-      case 'health:alert': {
-        const payload = event.payload as HealthAlertPayload;
-        const severityEmoji = {
-          info: 'ℹ️',
-          warning: '⚠️',
-          critical: '🚨',
-        }[payload.severity];
-        return `${severityEmoji} ヘルスアラート: ${payload.message}`;
-      }
-
       case 'data:fetched': {
         const payload = event.payload as DataFetchedPayload;
         return `📥 ${payload.sourceName}から${payload.recordCount}件のデータを取得しました`;
-      }
-
-      case 'system:error': {
-        const payload = event.payload as SystemErrorPayload;
-        return `❌ システムエラー: ${payload.error}`;
       }
 
       default:

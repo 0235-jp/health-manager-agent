@@ -11,9 +11,7 @@ import type { ReportContent } from './agent.js';
 export type NotificationEventType =
   | 'report:generated'
   | 'report:daily'
-  | 'health:alert'
-  | 'data:fetched'
-  | 'system:error';
+  | 'data:fetched';
 
 /**
  * Notificationプラグインのマニフェスト
@@ -36,16 +34,6 @@ export interface ReportGeneratedPayload {
 }
 
 /**
- * 健康アラートペイロード
- */
-export interface HealthAlertPayload {
-  alertType: string;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  relatedData?: Record<string, unknown>;
-}
-
-/**
  * データ取得完了ペイロード
  */
 export interface DataFetchedPayload {
@@ -55,22 +43,9 @@ export interface DataFetchedPayload {
 }
 
 /**
- * システムエラーペイロード
- */
-export interface SystemErrorPayload {
-  error: string;
-  stack?: string;
-  context?: Record<string, unknown>;
-}
-
-/**
  * 通知ペイロード
  */
-export type NotificationPayload =
-  | ReportGeneratedPayload
-  | HealthAlertPayload
-  | DataFetchedPayload
-  | SystemErrorPayload;
+export type NotificationPayload = ReportGeneratedPayload | DataFetchedPayload;
 
 /**
  * 通知イベント
