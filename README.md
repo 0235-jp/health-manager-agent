@@ -76,6 +76,9 @@ pnpm dev:logs
 | コマンド | 説明 |
 |---------|------|
 | `pnpm prod` | プロダクションサーバー起動（サーバー:3001, フロント:4173） |
+| `pnpm prod:bg` | バックグラウンドで起動 |
+| `pnpm prod:stop` | バックグラウンドプロセス停止 |
+| `pnpm prod:logs` | ログをtailで表示 |
 | `pnpm prod:server` | サーバーのみ起動 |
 | `pnpm prod:frontend` | フロントエンドのみ起動 |
 

@@ -18,10 +18,17 @@ plugins/         # データソース/エージェント/通知プラグイン
 ### 起動コマンド
 
 ```bash
+# 開発
 pnpm dev          # 開発サーバー起動（サーバー:3001, フロント:5173）
 pnpm dev:bg       # バックグラウンド起動
 pnpm dev:stop     # 停止
 pnpm dev:logs     # ログ確認
+
+# プロダクション
+pnpm prod         # プロダクション起動（サーバー:3001, フロント:4173）
+pnpm prod:bg      # バックグラウンド起動
+pnpm prod:stop    # 停止
+pnpm prod:logs    # ログ確認
 ```
 
 ### ビルド・テスト
