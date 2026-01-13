@@ -84,6 +84,7 @@ pnpm dev:logs
 | コマンド | 説明 |
 |---------|------|
 | `pnpm build` | 全パッケージをビルド |
+| `pnpm plugins:install` | 全プラグインの依存関係をインストール |
 | `pnpm plugins:build` | 全プラグインをビルド |
 | `pnpm plugins:build:zip` | 全プラグインをzipでビルド |
 | `pnpm lint` | 全パッケージをリント |

@@ -20,6 +20,7 @@
     "prod:server": "npm run start -w packages/server",
     "prod:frontend": "npm run start -w packages/frontend",
     "build": "npm run build --workspaces --if-present",
+    "plugins:install": "for dir in plugins/*/; do (cd \"$dir\" && pnpm install); done",
     "plugins:build": "for dir in plugins/*/; do (cd \"$dir\" && pnpm build); done",
     "plugins:build:zip": "for dir in plugins/*/; do (cd \"$dir\" && pnpm build:zip); done",
     "lint": "npm run lint --workspaces --if-present",

@@ -26,6 +26,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Install plugin dependencies
+        run: |
+          for dir in plugins/*/; do
+            (cd "$dir" && pnpm install)
+          done
+
       - name: Build plugins
         run: pnpm plugins:build:zip
 
