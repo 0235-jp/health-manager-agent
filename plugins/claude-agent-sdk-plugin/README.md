@@ -1,4 +1,4 @@
-# Claude Agent SDK Plugin
+# claude-agent-sdk-plugin
 
 Claude Agent SDKを使用してヘルスデータを分析し、レポートを生成するAIエージェントプラグインです。
 

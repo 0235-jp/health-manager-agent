@@ -97,16 +97,30 @@ health-manager-agent/
 ├── packages/
 │   ├── frontend/          # React フロントエンド
 │   └── server/            # Express バックエンド
-├── plugins/               # プラグイン（別途インストール可能）
-│   ├── claude-agent-sdk/  # Claude Agent SDK プラグイン
-│   ├── openai-chat/       # OpenAI互換 プラグイン
-│   ├── huawei-health/     # Huawei Health プラグイン
-│   ├── oura-ring/         # Oura Ring プラグイン
-│   └── webhook-notification/ # Webhook通知プラグイン
+├── plugins/                       # プラグイン（別途インストール可能）
+│   ├── claude-agent-sdk-plugin/   # Claude Agent SDK プラグイン
+│   ├── openai-chat-plugin/        # OpenAI互換 プラグイン
+│   ├── huawei-health-plugin/      # Huawei Health プラグイン
+│   ├── oura-ring-plugin/          # Oura Ring プラグイン
+│   └── webhook-notification-plugin/ # Webhook通知プラグイン
 ├── docs/                  # 設計ドキュメント
 ├── data/                  # データファイル（SQLite DB等）
 └── logs/                  # ログファイル
 ```
+
+## プラグイン
+
+公式プラグインは [GitHub Releases](https://github.com/KoheiYamashita/health-manager-agent/releases) からダウンロードできます。
+
+| プラグイン | 説明 |
+|-----------|------|
+| claude-agent-sdk-plugin | Claude Agent SDK を使用した AI 分析 |
+| openai-chat-plugin | OpenAI 互換 API を使用した AI 分析 |
+| huawei-health-plugin | Huawei Health からデータ取得 |
+| oura-ring-plugin | Oura Ring からデータ取得 |
+| webhook-notification-plugin | Webhook 通知 |
+
+ダウンロードした ZIP ファイルは管理画面からアップロードするか、`plugins/` ディレクトリに展開してください。
 
 ## ドキュメント
 

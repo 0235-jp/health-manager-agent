@@ -1,5 +1,5 @@
 {
-  "name": "webhook-notification",
+  "name": "webhook-notification-plugin",
   "displayName": "Webhook通知",
   "version": "1.0.0",
   "type": "notification",

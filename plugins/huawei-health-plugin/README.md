@@ -1,4 +1,4 @@
-# Huawei Health Plugin
+# huawei-health-plugin
 
 Huawei Health Kit REST APIからヘルスデータを取得するプラグインです。
 

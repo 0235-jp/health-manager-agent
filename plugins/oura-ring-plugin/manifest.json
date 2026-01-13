@@ -1,5 +1,5 @@
 {
-  "name": "oura-ring",
+  "name": "oura-ring-plugin",
   "displayName": "Oura Ring",
   "version": "1.2.0",
   "type": "data-source",

@@ -1,5 +1,5 @@
 {
-  "name": "openai-chat",
+  "name": "openai-chat-plugin",
   "displayName": "OpenAI Chat",
   "version": "1.0.0",
   "type": "agent",

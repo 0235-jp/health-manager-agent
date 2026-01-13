@@ -14,7 +14,7 @@ Health Manager Agent のプラグインシステムは 3 タイプのプラグ�
 
 ```
 plugins/
-├── my-plugin/
+├── my-awesome-plugin/
 │   ├── src/
 │   │   ├── index.ts       # エントリーポイント
 │   │   └── ...
@@ -23,6 +23,8 @@ plugins/
 │   ├── package.json
 │   └── tsconfig.json
 ```
+
+**命名規則**: フォルダ名・プラグイン名は末尾に `-plugin` を付ける（例: `oura-ring-plugin`）
 
 ## manifest.json
 
@@ -226,7 +228,7 @@ class MyNotificationPlugin implements NotificationPlugin {
 
 ```bash
 # ビルド
-cd plugins/my-plugin
+cd plugins/my-awesome-plugin
 pnpm install
 pnpm build
 

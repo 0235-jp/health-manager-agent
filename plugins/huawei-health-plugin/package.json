@@ -1,7 +1,7 @@
 {
-  "name": "@health-manager/webhook-notification",
+  "name": "@health-manager/huawei-health-plugin",
   "version": "1.0.0",
-  "description": "Webhook Notification Plugin for Health Manager",
+  "description": "Huawei Health Data Source Plugin for Health Manager",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

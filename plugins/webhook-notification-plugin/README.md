@@ -1,4 +1,4 @@
-# Webhook Notification Plugin
+# webhook-notification-plugin
 
 Webhookを使用してレポートやアラートを外部サービスに通知するプラグインです。
 

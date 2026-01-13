@@ -1,5 +1,5 @@
 {
-  "name": "huawei-health",
+  "name": "huawei-health-plugin",
   "displayName": "Huawei Health",
   "version": "1.0.0",
   "type": "data-source",

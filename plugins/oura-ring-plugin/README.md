@@ -1,4 +1,4 @@
-# Oura Ring Data Source Plugin
+# oura-ring-plugin
 
 Oura Ring API v2からヘルスデータを取得するデータソースプラグインです。
 
