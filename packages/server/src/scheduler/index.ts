@@ -87,6 +87,67 @@ export interface DataCollectionResult {
   skipped: number;
 }
 
+/** レポート生成除外時間帯 */
+export interface ExcludedPeriod {
+  id: string;
+  /** 開始時刻 (HH:MM 形式) */
+  startTime: string;
+  /** 終了時刻 (HH:MM 形式) */
+  endTime: string;
+  enabled: boolean;
+}
+
+/**
+ * 時刻文字列（HH:MM）を分に変換
+ */
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+/**
+ * 指定した分が時間帯内かを判定
+ * 日をまたぐ時間帯（例: 23:00 - 07:00）にも対応
+ */
+function isMinutesInRange(minutes: number, startMinutes: number, endMinutes: number): boolean {
+  if (startMinutes <= endMinutes) {
+    // 同日内の時間帯（例: 12:00 - 13:00）
+    return minutes >= startMinutes && minutes < endMinutes;
+  }
+  // 日をまたぐ時間帯（例: 23:00 - 07:00）
+  return minutes >= startMinutes || minutes < endMinutes;
+}
+
+/**
+ * 現在時刻が除外時間帯内かどうかを判定
+ */
+function isInExcludedPeriod(
+  excludedPeriods: ExcludedPeriod[],
+  timezone: string
+): boolean {
+  if (!excludedPeriods || excludedPeriods.length === 0) {
+    return false;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const currentMinutes = timeToMinutes(formatter.format(new Date()));
+
+  return excludedPeriods
+    .filter((period) => period.enabled)
+    .some((period) =>
+      isMinutesInRange(
+        currentMinutes,
+        timeToMinutes(period.startTime),
+        timeToMinutes(period.endTime)
+      )
+    );
+}
+
 export class Scheduler {
   private dataCollectionJob: cron.ScheduledTask | null = null;
   private dailyReportJob: cron.ScheduledTask | null = null;
@@ -221,41 +282,49 @@ export class Scheduler {
     // 7. 取得時レポート生成（Agentプラグインがある場合のみ）
     const currentAgent = pluginManager.getCurrentAgent();
     if (currentAgent && inserted > 0) {
-      try {
-        // 期間の計算（全プラグインの中で最も早い開始時刻を使用）
-        const periodStart = Object.values(perPluginOptions).reduce(
-          (earliest, opt) => (opt.startDate && opt.startDate < earliest ? opt.startDate : earliest),
-          periodEnd
-        );
+      // 除外時間帯チェック
+      const excludedPeriods = (settingsRepository.get('report_excluded_periods') as ExcludedPeriod[]) || [];
+      const timezone = (settingsRepository.get('timezone') as string) || Scheduler.DEFAULT_TIMEZONE;
 
-        const content = await agentService.generateReport({
-          reportType: 'on_fetch',
-          periodStart,
-          periodEnd,
-        });
+      if (isInExcludedPeriod(excludedPeriods, timezone)) {
+        console.log('[Scheduler] Skipping on-fetch report generation (in excluded period)');
+      } else {
+        try {
+          // 期間の計算（全プラグインの中で最も早い開始時刻を使用）
+          const periodStart = Object.values(perPluginOptions).reduce(
+            (earliest, opt) => (opt.startDate && opt.startDate < earliest ? opt.startDate : earliest),
+            periodEnd
+          );
 
-        const report = reportsRepository.create({
-          reportType: 'on_fetch',
-          periodStart: periodStart.toISOString(),
-          periodEnd: periodEnd.toISOString(),
-          content,
-        });
-
-        console.log(`[Scheduler] On-fetch report generated: id=${report.id}`);
-
-        await this.publishEvent({
-          type: 'report:generated',
-          timestamp: new Date(),
-          payload: {
-            reportId: report.id,
+          const content = await agentService.generateReport({
             reportType: 'on_fetch',
-            content,
             periodStart,
             periodEnd,
-          },
-        });
-      } catch (error) {
-        console.error('[Scheduler] Failed to generate on-fetch report:', error);
+          });
+
+          const report = reportsRepository.create({
+            reportType: 'on_fetch',
+            periodStart: periodStart.toISOString(),
+            periodEnd: periodEnd.toISOString(),
+            content,
+          });
+
+          console.log(`[Scheduler] On-fetch report generated: id=${report.id}`);
+
+          await this.publishEvent({
+            type: 'report:generated',
+            timestamp: new Date(),
+            payload: {
+              reportId: report.id,
+              reportType: 'on_fetch',
+              content,
+              periodStart,
+              periodEnd,
+            },
+          });
+        } catch (error) {
+          console.error('[Scheduler] Failed to generate on-fetch report:', error);
+        }
       }
     }
 

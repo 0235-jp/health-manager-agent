@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
 import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
-import type { CustomInstruction } from '../types';
+import type { CustomInstruction, ExcludedPeriod } from '../types';
 
 interface SettingsFormData {
   collection_interval: number;
@@ -269,6 +269,177 @@ function DataBackfillSection(): ReactElement {
   );
 }
 
+interface ExcludedPeriodItemProps {
+  period: ExcludedPeriod;
+  onToggle: () => void;
+  onDelete: () => void;
+  onChange: (field: 'startTime' | 'endTime', value: string) => void;
+}
+
+function ExcludedPeriodItem({
+  period,
+  onToggle,
+  onDelete,
+  onChange,
+}: ExcludedPeriodItemProps): ReactElement {
+  return (
+    <div className="flex items-center gap-3 p-3 border rounded-lg bg-white">
+      <input
+        type="checkbox"
+        checked={period.enabled}
+        onChange={onToggle}
+        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+      <div className="flex items-center gap-2 flex-1">
+        <input
+          type="time"
+          value={period.startTime}
+          onChange={(e) => onChange('startTime', e.target.value)}
+          className="px-2 py-1 border rounded-md text-sm"
+        />
+        <span className="text-gray-500">~</span>
+        <input
+          type="time"
+          value={period.endTime}
+          onChange={(e) => onChange('endTime', e.target.value)}
+          className="px-2 py-1 border rounded-md text-sm"
+        />
+      </div>
+      <button
+        onClick={onDelete}
+        className="text-sm text-red-600 hover:text-red-800"
+      >
+        削除
+      </button>
+    </div>
+  );
+}
+
+function ReportExcludedPeriodsSection(): ReactElement {
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  });
+
+  const [editedPeriods, setEditedPeriods] = useState<ExcludedPeriod[] | null>(null);
+
+  const savedPeriods = settings?.report_excluded_periods ?? [];
+  const isEditing = editedPeriods !== null;
+  const displayPeriods = editedPeriods ?? savedPeriods;
+
+  const updateMutation = useMutation({
+    mutationFn: (periods: ExcludedPeriod[]) =>
+      api.settings.update({ report_excluded_periods: periods }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setEditedPeriods(null);
+    },
+  });
+
+  /** 編集中の配列を取得、なければ保存済みをコピー */
+  function getEditablePeriods(): ExcludedPeriod[] {
+    return editedPeriods ?? [...savedPeriods];
+  }
+
+  function handleAdd(): void {
+    const newPeriod: ExcludedPeriod = {
+      id: crypto.randomUUID(),
+      startTime: '23:00',
+      endTime: '07:00',
+      enabled: true,
+    };
+    setEditedPeriods([...getEditablePeriods(), newPeriod]);
+  }
+
+  function handleToggle(id: string): void {
+    setEditedPeriods(
+      getEditablePeriods().map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p))
+    );
+  }
+
+  function handleDelete(id: string): void {
+    setEditedPeriods(getEditablePeriods().filter((p) => p.id !== id));
+  }
+
+  function handleTimeChange(id: string, field: 'startTime' | 'endTime', value: string): void {
+    setEditedPeriods(
+      getEditablePeriods().map((p) => (p.id === id ? { ...p, [field]: value } : p))
+    );
+  }
+
+  function handleSave(): void {
+    if (editedPeriods) {
+      updateMutation.mutate(editedPeriods);
+    }
+  }
+
+  function handleCancel(): void {
+    setEditedPeriods(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      {displayPeriods.length === 0 ? (
+        <p className="text-gray-400 text-sm">
+          除外時間帯が設定されていません
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {displayPeriods.map((period) => (
+            <ExcludedPeriodItem
+              key={period.id}
+              period={period}
+              onToggle={() => handleToggle(period.id)}
+              onDelete={() => handleDelete(period.id)}
+              onChange={(field, value) => handleTimeChange(period.id, field, value)}
+            />
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={handleAdd}
+        className="text-sm text-blue-600 hover:text-blue-800"
+      >
+        + 時間帯を追加
+      </button>
+
+      {isEditing && (
+        <div className="flex gap-2 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {updateMutation.isPending ? '保存中...' : '保存'}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
+          >
+            キャンセル
+          </button>
+        </div>
+      )}
+
+      {updateMutation.isSuccess && !isEditing && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+          設定を保存しました
+        </div>
+      )}
+
+      {updateMutation.isError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          エラー: {(updateMutation.error as Error).message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CustomInstructionsSection(): ReactElement {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -496,6 +667,16 @@ export function Settings(): ReactElement {
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-medium text-gray-800">データ取得</h3>
         <DataBackfillSection />
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-2 text-lg font-medium text-gray-800">
+          レポート生成除外時間帯
+        </h3>
+        <p className="mb-4 text-sm text-gray-600">
+          指定した時間帯はデータ収集時の自動レポート生成をスキップします。日次レポートには影響しません。
+        </p>
+        <ReportExcludedPeriodsSection />
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">

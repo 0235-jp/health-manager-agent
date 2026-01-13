@@ -18,11 +18,22 @@ export interface PaginatedResponse<T> {
   };
 }
 
+/** レポート生成除外時間帯 */
+export interface ExcludedPeriod {
+  id: string;
+  /** 開始時刻 (HH:MM 形式) */
+  startTime: string;
+  /** 終了時刻 (HH:MM 形式) */
+  endTime: string;
+  enabled: boolean;
+}
+
 export interface Settings {
   collection_interval: number;
   timezone: string;
   active_plugins: string[];
   data_source_priority: Record<string, string>;
+  report_excluded_periods: ExcludedPeriod[];
 }
 
 export interface ApiError {
