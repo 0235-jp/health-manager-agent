@@ -45,6 +45,13 @@ const plugins = pluginManager.getAllPlugins();
 const dataSources = pluginManager.getPluginsByType('data-source');
 const currentAgent = pluginManager.getCurrentAgent();
 
+// レポート生成（AgentPlugin経由）
+const report = await pluginManager.generateReport({
+  reportType: 'daily',
+  periodStart,
+  periodEnd,
+});
+
 // プラグイン操作
 await pluginManager.installPlugin(zipBuffer);
 await pluginManager.uninstallPlugin(name);

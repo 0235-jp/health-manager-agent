@@ -4,10 +4,10 @@ export function seedInitialData(): void {
   const db = getDatabase();
 
   // Insert standard data types
+  // NOTE: height（身長）は設定画面のユーザープロファイルで設定するため、標準タイプから除外
   const standardDataTypes = [
     // 身体測定
     { name: 'body_weight', display_name: '体重', category: '身体', unit: 'kg' },
-    { name: 'height', display_name: '身長', category: '身体', unit: 'cm' },
     { name: 'body_fat', display_name: '体脂肪率', category: '身体', unit: '%' },
     { name: 'muscle_mass', display_name: '筋肉量', category: '身体', unit: 'kg' },
     { name: 'bone_mass', display_name: '骨量', category: '身体', unit: 'kg' },

@@ -7,6 +7,94 @@ import { settingsRepository } from '../../db/repositories/settings.js';
 
 const DEFAULT_TIMEZONE = 'Asia/Tokyo';
 
+const SEX_LABELS: Record<string, string> = {
+  male: '男性',
+  female: '女性',
+  other: 'その他',
+};
+
+/**
+ * Format data type categories for display
+ */
+function formatDataTypeCategory(
+  categories: Record<string, readonly string[]>
+): string {
+  return Object.entries(categories)
+    .map(([category, types]) => `- ${category}: ${types.join(', ')}`)
+    .join('\n');
+}
+
+/**
+ * Data type categories for report analysis
+ *
+ * TREND_BASED: 計測頻度が低い、または範囲外でも最新の傾向を分析に含めたいデータ
+ *   → get-health-data-trend や get-health-data-latest で最新傾向を取得
+ *
+ * RANGE_BASED: 計測頻度が高く、指定範囲内のデータを見たいデータ
+ *   → get-health-data で範囲指定して取得
+ */
+export const DATA_TYPE_CATEGORIES = {
+  TREND_BASED: {
+    身体測定: [
+      'body_weight',
+      'body_fat',
+      'muscle_mass',
+      'bone_mass',
+      'body_water',
+      'visceral_fat',
+    ],
+    フィットネス: ['vo2_max', 'cardiovascular_age'],
+    健康検査: ['blood_glucose', 'uric_acid', 'urine_bilirubin', 'urine_glucose'],
+    睡眠: ['sleep_duration', 'deep_sleep', 'light_sleep', 'rem_sleep'],
+    体温: [
+      'body_temperature',
+      'skin_temperature',
+      'body_temperature_rest',
+      'temperature_deviation',
+    ],
+  },
+  RANGE_BASED: {
+    '心臓・循環器': [
+      'heart_rate',
+      'resting_heart_rate',
+      'heart_rate_variability',
+      'blood_pressure_systolic',
+      'blood_pressure_diastolic',
+      'spo2',
+      'ecg',
+      'ecg_afib',
+    ],
+    活動: ['steps', 'workout_duration', 'workout_calories', 'calories_burned'],
+    栄養: [
+      'water_intake',
+      'calories_intake',
+      'nutrition_protein',
+      'nutrition_carbs',
+      'nutrition_fat',
+    ],
+    精神: ['session_duration'],
+    CGM: ['cgm_blood_glucose'],
+    女性の健康: [
+      'menstrual_flow',
+      'menstrual_cycle',
+      'ovulation_detection',
+      'cervical_mucus',
+      'dysmenorrhoea',
+    ],
+  },
+} as const;
+
+/**
+ * User profile type for prompts
+ */
+interface UserProfile {
+  birthDate?: string;
+  height?: number;
+  sex?: 'male' | 'female' | 'other';
+  medicalConditions?: string[];
+  allergies?: string[];
+}
+
 /**
  * Custom instruction for prompts
  */
@@ -73,11 +161,15 @@ export class DefaultPromptBuilder implements PromptBuilder {
     const dataAccessInstructions = useSkills
       ? this.buildSkillsInstructions()
       : this.buildToolsInstructions();
+    const userProfileSection = this.buildUserProfileSection();
+    const dataTypeCategoriesSection = this.buildDataTypeCategoriesSection();
 
     const basePrompt = `あなたはヘルスデータアナリストです。
 ユーザーのヘルスデータを分析し、${reportTypeLabel}評価レポートを作成してください。
-
+${userProfileSection ? `\n${userProfileSection}\n` : ''}
 ${dataAccessInstructions}
+
+${dataTypeCategoriesSection}
 
 レポートには以下を含めてください：
 - 全体的な健康状態のサマリー
@@ -210,5 +302,93 @@ ${params}`;
 ## ユーザーからの特別な指示
 以下の点に特に注意してください：
 ${list}`;
+  }
+
+  /**
+   * Build data type categories section for prompts
+   */
+  private buildDataTypeCategoriesSection(): string {
+    return `## データタイプと取得方法
+
+### トレンドベース（最新傾向を見るデータ）
+以下のデータは計測頻度が低い、または評価期間外でも最新の傾向を分析に含めるべきデータです。
+get-health-data-trend や get-health-data-latest を使用して最新傾向を取得してください。
+
+${formatDataTypeCategory(DATA_TYPE_CATEGORIES.TREND_BASED)}
+
+### 範囲ベース（期間内データを見るデータ）
+以下のデータは評価期間内のデータを get-health-data で取得して分析してください。
+
+${formatDataTypeCategory(DATA_TYPE_CATEGORIES.RANGE_BASED)}
+
+### その他のデータタイプ
+上記以外のデータタイプも存在する場合があります。get-data-types で利用可能なデータタイプ一覧を確認し、分析に有用なものがあれば積極的に活用してください。`;
+  }
+
+  /**
+   * Build user profile section for prompts
+   */
+  private buildUserProfileSection(): string {
+    const settings = settingsRepository.getAll();
+    const profile = settings.user_profile as UserProfile | undefined;
+
+    if (!profile) {
+      return '';
+    }
+
+    const lines: string[] = [];
+
+    if (profile.birthDate) {
+      const age = this.calculateAge(profile.birthDate);
+      if (age !== null) {
+        lines.push(`- 年齢: ${age}歳`);
+      }
+    }
+
+    if (profile.height) {
+      lines.push(`- 身長: ${profile.height} cm`);
+    }
+
+    if (profile.sex) {
+      lines.push(`- 性別: ${SEX_LABELS[profile.sex] || profile.sex}`);
+    }
+
+    if (profile.medicalConditions && profile.medicalConditions.length > 0) {
+      lines.push(`- 持病: ${profile.medicalConditions.join('、')}`);
+    }
+
+    if (profile.allergies && profile.allergies.length > 0) {
+      lines.push(`- アレルギー: ${profile.allergies.join('、')}`);
+    }
+
+    if (lines.length === 0) {
+      return '';
+    }
+
+    return `## ユーザー情報
+${lines.join('\n')}`;
+  }
+
+  /**
+   * Calculate age from birth date
+   */
+  private calculateAge(birthDate: string): number | null {
+    const birth = new Date(birthDate);
+    if (isNaN(birth.getTime())) {
+      return null;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+      age--;
+    }
+
+    return age;
   }
 }

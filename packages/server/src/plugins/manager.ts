@@ -10,6 +10,7 @@ import type {
   AgentManifest,
   AgentPlugin,
   FetchOptions,
+  GenerateReportParams,
   HealthDataInput,
   NotificationEvent,
   NotificationPlugin,
@@ -18,8 +19,10 @@ import type {
   PluginFetchResult,
   PluginManifest,
   PluginType,
+  ReportContent,
 } from './interfaces/index.js';
 import { pluginsRepository, type PluginRecord } from '../db/repositories/plugins.js';
+import { customInstructionsRepository } from '../db/repositories/custom-instructions.js';
 import { DefaultToolExecutor, DefaultPromptBuilder } from './tools/index.js';
 import type { ToolExecutor, PromptBuilder } from './tools/index.js';
 
@@ -365,6 +368,31 @@ export class PluginManager {
     this.currentAgentName = pluginName;
     pluginsRepository.setCurrentAgentName(pluginName);
     console.log(`[PluginManager] Current agent set to: ${pluginName}`);
+  }
+
+  /**
+   * レポートを生成
+   * @param params レポート生成パラメータ
+   */
+  async generateReport(params: GenerateReportParams): Promise<ReportContent> {
+    const agent = this.getCurrentAgent();
+
+    if (!agent) {
+      throw new Error(
+        'No agent plugin installed. Please install an agent plugin from the Plugins page.'
+      );
+    }
+
+    // カスタム指示が指定されていない場合は取得
+    if (!params.customInstructions) {
+      const activeInstructions = customInstructionsRepository.findActive();
+      params.customInstructions = activeInstructions.map((inst) => ({
+        instruction: inst.instruction,
+        priority: inst.priority,
+      }));
+    }
+
+    return agent.generateReport(params);
   }
 
   // ========== 設定管理 ==========

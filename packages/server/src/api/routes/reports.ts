@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request } from 'express';
 import { reportsRepository } from '../../db/repositories/reports.js';
-import { AgentService } from '../../agent/index.js';
+import { PluginManager } from '../../plugins/manager.js';
 import { asyncHandler } from '../middlewares/async-handler.js';
 import { validateQuery, validateBody } from '../middlewares/validation.js';
 import {
@@ -82,8 +82,8 @@ reportsRouter.post(
       }
     }
 
-    const agentService = AgentService.getInstance();
-    const content = await agentService.generateReport({
+    const pluginManager = PluginManager.getInstance();
+    const content = await pluginManager.generateReport({
       reportType: report_type,
       periodStart,
       periodEnd,

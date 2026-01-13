@@ -8,7 +8,6 @@
  */
 
 import cron from 'node-cron';
-import { AgentService } from '../agent/index.js';
 import { PluginManager } from '../plugins/manager.js';
 import { reportsRepository } from '../db/repositories/reports.js';
 import { healthDataRepository } from '../db/repositories/health-data.js';
@@ -192,7 +191,6 @@ export class Scheduler {
     console.log('[Scheduler] Starting data collection...');
 
     const pluginManager = PluginManager.getInstance();
-    const agentService = AgentService.getInstance();
     const periodEnd = new Date();
 
     // 1. アクティブなDataSourceプラグインを取得
@@ -296,7 +294,7 @@ export class Scheduler {
             periodEnd
           );
 
-          const content = await agentService.generateReport({
+          const content = await pluginManager.generateReport({
             reportType: 'on_fetch',
             periodStart,
             periodEnd,
@@ -431,7 +429,6 @@ export class Scheduler {
     console.log('[Scheduler] Starting daily report generation...');
 
     const pluginManager = PluginManager.getInstance();
-    const agentService = AgentService.getInstance();
 
     // Agentプラグインがない場合はスキップ
     const currentAgent = pluginManager.getCurrentAgent();
@@ -452,7 +449,7 @@ export class Scheduler {
       console.log(`[Scheduler] Daily backfill: ${backfillResult.inserted} new records`);
 
       // 2. 日次レポート生成
-      const content = await agentService.generateReport({
+      const content = await pluginManager.generateReport({
         reportType: 'daily',
         periodStart,
         periodEnd,

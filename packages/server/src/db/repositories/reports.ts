@@ -1,5 +1,5 @@
 import { getDatabase } from '../index.js';
-import type { ReportContent } from '../../agent/interfaces/agent-adapter.js';
+import type { ReportContent } from '../../plugins/interfaces/agent.js';
 
 export interface ReportRecord {
   id: number;
@@ -103,25 +103,16 @@ export const reportsRepository = {
 
   findLatest(reportType?: 'on_fetch' | 'daily'): ReportWithContent | undefined {
     const db = getDatabase();
-    let stmt;
-    let record: ReportRecord | undefined;
-
-    if (reportType) {
-      stmt = db.prepare(`
-        SELECT * FROM reports
-        WHERE report_type = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-      `);
-      record = stmt.get(reportType) as ReportRecord | undefined;
-    } else {
-      stmt = db.prepare(`
-        SELECT * FROM reports
-        ORDER BY created_at DESC
-        LIMIT 1
-      `);
-      record = stmt.get() as ReportRecord | undefined;
-    }
+    const whereClause = reportType ? 'WHERE report_type = ?' : '';
+    const stmt = db.prepare(`
+      SELECT * FROM reports
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const record = reportType
+      ? (stmt.get(reportType) as ReportRecord | undefined)
+      : (stmt.get() as ReportRecord | undefined);
 
     return record ? parseReportContent(record) : undefined;
   },

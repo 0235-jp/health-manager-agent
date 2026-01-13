@@ -15,7 +15,6 @@
 
 ```
 src/
-├── agent/          # エージェント統合層
 ├── api/            # REST API
 │   ├── routes/     # エンドポイント
 │   ├── middlewares/# ミドルウェア
@@ -58,7 +57,6 @@ const data = healthDataRepository.findAll({ dataType: 'steps' });
 
 - `PluginManager`: プラグイン管理
 - `Scheduler`: 定期実行管理
-- `AgentService`: エージェント統合
 
 ### Event-Driven
 
