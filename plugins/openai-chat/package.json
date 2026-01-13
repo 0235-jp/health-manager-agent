@@ -10,7 +10,8 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "adm-zip": "^0.5.16"
+    "@types/node": "^25.0.7",
+    "adm-zip": "^0.5.16",
+    "typescript": "^5.7.2"
   }
 }

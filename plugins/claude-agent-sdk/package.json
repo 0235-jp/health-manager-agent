@@ -13,7 +13,8 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.3"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "adm-zip": "^0.5.16"
+    "@types/node": "^25.0.7",
+    "adm-zip": "^0.5.16",
+    "typescript": "^5.7.2"
   }
 }
