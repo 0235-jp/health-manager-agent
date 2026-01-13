@@ -103,7 +103,6 @@ health-manager-agent/
 │   ├── huawei-health-plugin/      # Huawei Health プラグイン
 │   ├── oura-ring-plugin/          # Oura Ring プラグイン
 │   └── webhook-notification-plugin/ # Webhook通知プラグイン
-├── docs/                  # 設計ドキュメント
 ├── data/                  # データファイル（SQLite DB等）
 └── logs/                  # ログファイル
 ```
@@ -121,8 +120,3 @@ health-manager-agent/
 | webhook-notification-plugin | Webhook 通知 |
 
 ダウンロードした ZIP ファイルは管理画面からアップロードするか、`plugins/` ディレクトリに展開してください。
-
-## ドキュメント
-
-- [概要設計書](docs/概要設計書.md)
-- [詳細設計書](docs/詳細設計書.md)
