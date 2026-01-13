@@ -3,6 +3,7 @@
   "displayName": "Huawei Health",
   "version": "1.0.0",
   "type": "data-source",
+  "minHostVersion": "1.0.0",
   "description": "Huawei Health Kit REST APIからヘルスデータを取得",
   "author": "Health Manager Agent",
   "main": "dist/index.js",

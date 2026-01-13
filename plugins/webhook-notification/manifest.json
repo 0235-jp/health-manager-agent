@@ -3,6 +3,7 @@
   "displayName": "Webhook通知",
   "version": "1.0.0",
   "type": "notification",
+  "minHostVersion": "1.0.0",
   "description": "Webhookを使用してレポートやアラートを外部サービスに通知",
   "author": "Health Manager Agent",
   "main": "dist/index.js",

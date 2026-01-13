@@ -3,6 +3,7 @@
   "displayName": "OpenAI Chat",
   "version": "1.0.0",
   "type": "agent",
+  "minHostVersion": "1.0.0",
   "description": "OpenAI API互換のエージェントプラグイン",
   "author": "Health Manager Agent",
   "main": "dist/index.js",

@@ -3,6 +3,7 @@
   "displayName": "Claude Agent SDK",
   "version": "1.2.0",
   "type": "agent",
+  "minHostVersion": "1.0.0",
   "description": "Claude Agent SDKを使用したAI分析プラグイン",
   "author": "Health Manager Agent",
   "main": "dist/index.js",

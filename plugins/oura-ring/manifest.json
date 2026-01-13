@@ -3,6 +3,7 @@
   "displayName": "Oura Ring",
   "version": "1.2.0",
   "type": "data-source",
+  "minHostVersion": "1.0.0",
   "description": "Oura Ring API v2からヘルスデータを取得",
   "author": "Health Manager Agent",
   "main": "dist/index.js",

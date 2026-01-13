@@ -12,6 +12,7 @@ import type {
   PluginManifest,
   PluginType,
 } from './interfaces/index.js';
+import { checkHostVersionCompatibility, isValidSemver } from './version.js';
 
 /**
  * 読み込まれたプラグイン
@@ -210,6 +211,11 @@ export class PluginLoader {
 
     if (!manifest.version || typeof manifest.version !== 'string') {
       errors.push('version is required and must be a string');
+    } else if (!isValidSemver(manifest.version)) {
+      // セマンティックバージョン形式のチェック
+      errors.push(
+        `version must be a valid semantic version (e.g., "1.0.0"), got "${manifest.version}"`
+      );
     }
 
     if (!manifest.type) {
@@ -227,6 +233,12 @@ export class PluginLoader {
 
     if (!manifest.main || typeof manifest.main !== 'string') {
       errors.push('main is required and must be a string');
+    }
+
+    // ホストAPIバージョン互換性チェック
+    const compatResult = checkHostVersionCompatibility(manifest.minHostVersion);
+    if (!compatResult.compatible && compatResult.message) {
+      errors.push(compatResult.message);
     }
 
     if (errors.length > 0) {

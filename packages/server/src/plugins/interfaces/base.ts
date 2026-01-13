@@ -39,6 +39,7 @@ export interface PluginManifest {
   main: string; // エントリーポイント (例: "dist/index.js")
   configSchema?: ConfigSchema; // 設定項目の定義
   requiredEnvVars?: string[]; // 必須環境変数
+  minHostVersion?: string; // 最小ホストAPIバージョン（例: "1.0.0"）
 }
 
 /**
