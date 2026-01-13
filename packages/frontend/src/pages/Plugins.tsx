@@ -1,17 +1,18 @@
 import type { ReactElement, ChangeEvent, FormEvent } from 'react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
 import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
-import type { Plugin, PluginType, ConfigField } from '../types';
+import type { Plugin, PluginType, ConfigField, DataTypeDefinition } from '../types';
 
-type TabType = 'all' | PluginType;
+type TabType = 'all' | PluginType | 'settings';
 
 const TABS: { key: TabType; label: string }[] = [
   { key: 'all', label: 'すべて' },
   { key: 'agent', label: 'エージェント' },
   { key: 'data-source', label: 'データソース' },
   { key: 'notification', label: '通知' },
+  { key: 'settings', label: '設定' },
 ];
 
 const PLUGIN_TYPE_CONFIG: Record<PluginType, { label: string; badgeClass: string }> = {
@@ -476,6 +477,163 @@ function FetchModal({ plugin, onClose }: FetchModalProps): ReactElement {
   );
 }
 
+/** 重複データタイプの情報 */
+interface OverlappingDataType {
+  dataType: DataTypeDefinition;
+  sources: Array<{ pluginName: string; displayName: string }>;
+}
+
+/** 重複データタイプを計算する */
+function getOverlappingDataTypes(plugins: Plugin[]): OverlappingDataType[] {
+  const dataTypeMap = new Map<string, OverlappingDataType>();
+
+  for (const plugin of plugins) {
+    if (plugin.type !== 'data-source' || !plugin.isActive || !plugin.supportedDataTypes) {
+      continue;
+    }
+
+    for (const dt of plugin.supportedDataTypes) {
+      const existing = dataTypeMap.get(dt.name);
+      const source = { pluginName: plugin.name, displayName: plugin.displayName };
+
+      if (existing) {
+        existing.sources.push(source);
+      } else {
+        dataTypeMap.set(dt.name, { dataType: dt, sources: [source] });
+      }
+    }
+  }
+
+  return Array.from(dataTypeMap.values()).filter((item) => item.sources.length >= 2);
+}
+
+interface DataSourcePrioritySectionProps {
+  plugins: Plugin[];
+}
+
+function DataSourcePrioritySection({ plugins }: DataSourcePrioritySectionProps): ReactElement {
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  });
+
+  const [editedPriority, setEditedPriority] = useState<Record<string, string> | null>(null);
+  const overlappingTypes = useMemo(() => getOverlappingDataTypes(plugins), [plugins]);
+
+  const savedPriority = settings?.data_source_priority || {};
+  const isEditing = editedPriority !== null;
+  const displayPriority = editedPriority ?? savedPriority;
+
+  const updateMutation = useMutation({
+    mutationFn: (priority: Record<string, string>) =>
+      api.settings.update({ data_source_priority: priority }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setEditedPriority(null);
+    },
+  });
+
+  function handleChange(dataType: string, source: string): void {
+    const current = editedPriority ?? { ...savedPriority };
+    if (source === '') {
+      const { [dataType]: _removed, ...rest } = current;
+      void _removed;
+      setEditedPriority(rest);
+    } else {
+      setEditedPriority({ ...current, [dataType]: source });
+    }
+  }
+
+  function handleSave(): void {
+    if (editedPriority) {
+      updateMutation.mutate(editedPriority);
+    }
+  }
+
+  function handleCancel(): void {
+    setEditedPriority(null);
+  }
+
+  if (overlappingTypes.length === 0) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-800">データソース優先度</h3>
+        <p className="text-gray-500 text-sm">
+          複数のデータソースが同じデータタイプを提供している場合にのみ、優先度を設定できます。
+        </p>
+        <p className="text-gray-400 text-sm mt-2">
+          現在、重複するデータタイプはありません。
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <h3 className="mb-2 text-lg font-medium text-gray-800">データソース優先度</h3>
+      <p className="text-gray-500 text-sm mb-4">
+        複数のデータソースが同じデータタイプを提供している場合、どのソースを優先するか設定できます。
+      </p>
+
+      <div className="space-y-3">
+        {overlappingTypes.map(({ dataType, sources }) => (
+          <div key={dataType.name} className="flex items-center gap-4 py-2 border-b border-gray-100 last:border-0">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700">{dataType.displayName}</p>
+              <p className="text-xs text-gray-400">{dataType.name}</p>
+            </div>
+            <select
+              value={displayPriority[dataType.name] || ''}
+              onChange={(e) => handleChange(dataType.name, e.target.value)}
+              className="px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">自動（先着優先）</option>
+              {sources.map((source) => (
+                <option key={source.pluginName} value={source.pluginName}>
+                  {source.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {isEditing && (
+        <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {updateMutation.isPending ? '保存中...' : '保存'}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
+          >
+            キャンセル
+          </button>
+        </div>
+      )}
+
+      {updateMutation.isSuccess && !isEditing && (
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+          設定を保存しました
+        </div>
+      )}
+
+      {updateMutation.isError && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          エラー: {(updateMutation.error as Error).message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Plugins(): ReactElement {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -555,7 +713,7 @@ export function Plugins(): ReactElement {
     }
   }
 
-  const filteredPlugins = activeTab === 'all'
+  const filteredPlugins = activeTab === 'all' || activeTab === 'settings'
     ? plugins
     : plugins.filter((p) => p.type === activeTab);
 
@@ -623,17 +781,21 @@ export function Plugins(): ReactElement {
               }`}
             >
               {tab.label}
-              <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                {tab.key === 'all'
-                  ? plugins.length
-                  : plugins.filter((p) => p.type === tab.key).length}
-              </span>
+              {tab.key !== 'settings' && (
+                <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                  {tab.key === 'all'
+                    ? plugins.length
+                    : plugins.filter((p) => p.type === tab.key).length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
       </div>
 
-      {filteredPlugins.length === 0 ? (
+      {activeTab === 'settings' ? (
+        <DataSourcePrioritySection plugins={plugins} />
+      ) : filteredPlugins.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
           <p className="text-gray-500">
             {activeTab === 'all'

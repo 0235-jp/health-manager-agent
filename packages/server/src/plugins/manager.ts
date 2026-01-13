@@ -16,9 +16,10 @@ import type {
   PerPluginFetchOptions,
   PluginContext,
   PluginFetchResult,
+  PluginManifest,
   PluginType,
 } from './interfaces/index.js';
-import { pluginsRepository } from '../db/repositories/plugins.js';
+import { pluginsRepository, type PluginRecord } from '../db/repositories/plugins.js';
 import { DefaultToolExecutor, DefaultPromptBuilder } from './tools/index.js';
 import type { ToolExecutor, PromptBuilder } from './tools/index.js';
 
@@ -98,13 +99,16 @@ export class PluginManager {
     for (const pluginRecord of activePlugins) {
       try {
         const pluginPath = path.join(this.pluginsDir, pluginRecord.name);
-        await this.loadPluginFromPath(pluginPath);
+        const state = await this.loadPluginFromPath(pluginPath);
 
         // DBから保存された設定を取得して適用
         const savedConfig = pluginsRepository.getConfig(pluginRecord.name);
         if (savedConfig && Object.keys(savedConfig).length > 0) {
           await this.updatePluginConfig(pluginRecord.name, savedConfig);
         }
+
+        // manifestのsupportedDataTypesをDBに保存（既存プラグインのマイグレーション対応）
+        this.migrateSupportedDataTypes(state.manifest, pluginRecord);
 
         console.log(`[PluginManager] Auto-loaded plugin: ${pluginRecord.name}`);
       } catch (error) {
@@ -264,6 +268,21 @@ export class PluginManager {
     }
 
     return context;
+  }
+
+  /**
+   * supportedDataTypesをDBにマイグレーション（既存プラグイン対応）
+   */
+  private migrateSupportedDataTypes(
+    manifest: PluginManifest,
+    pluginRecord: PluginRecord
+  ): void {
+    const extendedManifest = manifest as PluginManifest & { supportedDataTypes?: unknown[] };
+    if (extendedManifest.supportedDataTypes && !pluginRecord.supported_data_types) {
+      pluginsRepository.update(pluginRecord.name, {
+        supportedDataTypes: extendedManifest.supportedDataTypes,
+      });
+    }
   }
 
   /**

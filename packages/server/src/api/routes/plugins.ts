@@ -16,6 +16,12 @@ import type { DataSourcePlugin } from '../../plugins/interfaces/data-source.js';
 import type { NotificationPlugin } from '../../plugins/interfaces/notification.js';
 import type { AgentManifest } from '../../plugins/interfaces/agent.js';
 
+interface ExtendedManifest extends PluginManifest {
+  supportedDataTypes?: unknown[];
+  supportedModels?: string[];
+  capabilities?: Record<string, unknown>;
+}
+
 interface PluginResponse {
   name: string;
   displayName: string;
@@ -35,11 +41,7 @@ interface PluginResponse {
  * PluginStateからレスポンス形式に変換
  */
 function toPluginResponse(state: PluginState): PluginResponse {
-  const manifest = state.plugin.manifest as PluginManifest & {
-    supportedDataTypes?: unknown[];
-    supportedModels?: string[];
-    capabilities?: Record<string, unknown>;
-  };
+  const manifest = state.plugin.manifest as ExtendedManifest;
 
   return {
     name: manifest.name,
@@ -100,6 +102,7 @@ pluginsRouter.get('/', (_req, res) => {
         isActive: r.is_active === 1,
         isLoaded: false,
         config: JSON.parse(r.config),
+        supportedDataTypes: r.supported_data_types ? JSON.parse(r.supported_data_types) : undefined,
         installedAt: r.installed_at,
         updatedAt: r.updated_at,
       }));
@@ -355,19 +358,22 @@ pluginsRouter.post('/install', upload.single('plugin'), async (req, res) => {
     const plugin = await pluginManager.installPlugin(uploadedFile.path);
 
     // DBに登録
-    const existing = pluginsRepository.findByName(plugin.manifest.name);
+    const manifest = plugin.manifest as ExtendedManifest;
+    const existing = pluginsRepository.findByName(manifest.name);
     if (existing) {
-      pluginsRepository.update(plugin.manifest.name, {
-        version: plugin.manifest.version,
-        description: plugin.manifest.description,
+      pluginsRepository.update(manifest.name, {
+        version: manifest.version,
+        description: manifest.description,
+        supportedDataTypes: manifest.supportedDataTypes,
       });
     } else {
       pluginsRepository.create({
-        name: plugin.manifest.name,
-        displayName: plugin.manifest.displayName,
-        version: plugin.manifest.version,
-        type: plugin.manifest.type,
-        description: plugin.manifest.description,
+        name: manifest.name,
+        displayName: manifest.displayName,
+        version: manifest.version,
+        type: manifest.type,
+        description: manifest.description,
+        supportedDataTypes: manifest.supportedDataTypes,
         isActive: true,
       });
     }
@@ -375,10 +381,10 @@ pluginsRouter.post('/install', upload.single('plugin'), async (req, res) => {
     res.json({
       success: true,
       plugin: {
-        name: plugin.manifest.name,
-        displayName: plugin.manifest.displayName,
-        version: plugin.manifest.version,
-        type: plugin.manifest.type,
+        name: manifest.name,
+        displayName: manifest.displayName,
+        version: manifest.version,
+        type: manifest.type,
       },
     });
   } catch (error) {

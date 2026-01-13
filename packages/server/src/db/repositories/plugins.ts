@@ -12,6 +12,7 @@ export interface PluginRecord {
   version: string;
   type: string;
   description: string | null;
+  supported_data_types: string | null; // JSON文字列
   config: string; // JSON文字列
   is_active: number;
   installed_at: string;
@@ -24,6 +25,7 @@ export interface PluginCreateInput {
   version: string;
   type: string;
   description?: string;
+  supportedDataTypes?: unknown[];
   config?: Record<string, unknown>;
   isActive?: boolean;
 }
@@ -32,6 +34,7 @@ export interface PluginUpdateInput {
   displayName?: string;
   version?: string;
   description?: string;
+  supportedDataTypes?: unknown[];
   config?: Record<string, unknown>;
   isActive?: boolean;
 }
@@ -79,15 +82,16 @@ export const pluginsRepository = {
     const db = getDatabase();
     const now = new Date().toISOString();
 
-    const result = db.prepare(`
-      INSERT INTO plugins (name, display_name, version, type, description, config, is_active, installed_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    db.prepare(`
+      INSERT INTO plugins (name, display_name, version, type, description, supported_data_types, config, is_active, installed_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       input.name,
       input.displayName,
       input.version,
       input.type,
       input.description || null,
+      input.supportedDataTypes ? JSON.stringify(input.supportedDataTypes) : null,
       JSON.stringify(input.config || {}),
       input.isActive !== false ? 1 : 0,
       now,
@@ -101,35 +105,28 @@ export const pluginsRepository = {
    * プラグインを更新
    */
   update(name: string, input: PluginUpdateInput): PluginRecord | undefined {
-    const db = getDatabase();
     const existing = this.findByName(name);
-
     if (!existing) {
       return undefined;
     }
 
+    const fieldMappings: Array<{ key: keyof PluginUpdateInput; column: string; transform?: (v: unknown) => unknown }> = [
+      { key: 'displayName', column: 'display_name' },
+      { key: 'version', column: 'version' },
+      { key: 'description', column: 'description' },
+      { key: 'supportedDataTypes', column: 'supported_data_types', transform: JSON.stringify },
+      { key: 'config', column: 'config', transform: JSON.stringify },
+      { key: 'isActive', column: 'is_active', transform: (v) => (v ? 1 : 0) },
+    ];
+
     const updates: string[] = [];
     const values: unknown[] = [];
 
-    if (input.displayName !== undefined) {
-      updates.push('display_name = ?');
-      values.push(input.displayName);
-    }
-    if (input.version !== undefined) {
-      updates.push('version = ?');
-      values.push(input.version);
-    }
-    if (input.description !== undefined) {
-      updates.push('description = ?');
-      values.push(input.description);
-    }
-    if (input.config !== undefined) {
-      updates.push('config = ?');
-      values.push(JSON.stringify(input.config));
-    }
-    if (input.isActive !== undefined) {
-      updates.push('is_active = ?');
-      values.push(input.isActive ? 1 : 0);
+    for (const { key, column, transform } of fieldMappings) {
+      if (input[key] !== undefined) {
+        updates.push(`${column} = ?`);
+        values.push(transform ? transform(input[key]) : input[key]);
+      }
     }
 
     if (updates.length === 0) {
@@ -138,12 +135,10 @@ export const pluginsRepository = {
 
     updates.push('updated_at = ?');
     values.push(new Date().toISOString());
-
     values.push(name);
 
-    db.prepare(`
-      UPDATE plugins SET ${updates.join(', ')} WHERE name = ?
-    `).run(...values);
+    const db = getDatabase();
+    db.prepare(`UPDATE plugins SET ${updates.join(', ')} WHERE name = ?`).run(...values);
 
     return this.findByName(name);
   },

@@ -24,6 +24,62 @@ export interface BackfillResult {
   errors: Array<{ pluginName: string; error: string }>;
 }
 
+/** ヘルスデータの内部型 */
+interface HealthDataItem {
+  data_type: string;
+  value: number;
+  unit: string;
+  source: string;
+  recorded_at: string;
+}
+
+/**
+ * 優先度設定に基づいてデータをフィルタ
+ * 同じデータタイプ・時刻のデータが複数ソースから来た場合、優先ソースのデータのみを残す
+ */
+function filterByDataSourcePriority(
+  data: HealthDataItem[],
+  priority: Record<string, string>
+): HealthDataItem[] {
+  if (Object.keys(priority).length === 0) {
+    return data;
+  }
+
+  // データタイプ+時刻でグルーピング
+  const groups = new Map<string, HealthDataItem[]>();
+  for (const item of data) {
+    const key = `${item.data_type}_${item.recorded_at}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(item);
+    } else {
+      groups.set(key, [item]);
+    }
+  }
+
+  // 各グループで優先度に基づいてフィルタ
+  const result: HealthDataItem[] = [];
+  for (const items of groups.values()) {
+    if (items.length === 1) {
+      result.push(items[0]);
+      continue;
+    }
+
+    const preferredSource = priority[items[0].data_type];
+    if (!preferredSource) {
+      // 優先度設定がない場合は全て採用（DBのユニーク制約で重複排除）
+      result.push(...items);
+      continue;
+    }
+
+    // 優先ソースのデータを探す。なければ最初のデータを採用
+    const preferred = items.find((item) => item.source === preferredSource);
+    result.push(preferred ?? items[0]);
+  }
+
+  return result;
+}
+
 export interface DataCollectionResult {
   pluginResults: PluginFetchResult[];
   totalFetched: number;
@@ -135,11 +191,19 @@ export class Scheduler {
       }
     }
 
-    // 5. バッチでDB保存（INSERT OR IGNORE）
+    // 5. 優先度設定に基づいてフィルタしてからDB保存
     if (allData.length > 0) {
-      const batchResult = healthDataRepository.createBatch(allData);
+      const priority = (settingsRepository.get('data_source_priority') as Record<string, string>) || {};
+      const filteredData = filterByDataSourcePriority(allData, priority);
+      const filteredOut = allData.length - filteredData.length;
+
+      if (filteredOut > 0) {
+        console.log(`[Scheduler] Filtered out ${filteredOut} records by data source priority`);
+      }
+
+      const batchResult = healthDataRepository.createBatch(filteredData);
       inserted = batchResult.inserted;
-      console.log(`[Scheduler] Saved ${inserted}/${totalFetched} records (${totalFetched - inserted} duplicates skipped)`);
+      console.log(`[Scheduler] Saved ${inserted}/${filteredData.length} records (${filteredData.length - inserted} duplicates skipped)`);
 
       // 6. 通知イベント発火（data:fetched）
       const dataTypes = [...new Set(allData.map(d => d.data_type))];
@@ -265,15 +329,23 @@ export class Scheduler {
       }
     }
 
-    // バッチでDB保存（INSERT OR IGNORE）
+    // 優先度設定に基づいてフィルタしてからDB保存
     let inserted = 0;
     if (allData.length > 0) {
-      const batchResult = healthDataRepository.createBatch(allData);
+      const priority = (settingsRepository.get('data_source_priority') as Record<string, string>) || {};
+      const filteredData = filterByDataSourcePriority(allData, priority);
+      const filteredOut = allData.length - filteredData.length;
+
+      if (filteredOut > 0) {
+        console.log(`[Scheduler] Backfill: Filtered out ${filteredOut} records by data source priority`);
+      }
+
+      const batchResult = healthDataRepository.createBatch(filteredData);
       inserted = batchResult.inserted;
     }
 
     const skipped = allData.length - inserted;
-    console.log(`[Scheduler] Backfill completed: ${inserted}/${allData.length} records inserted (${skipped} duplicates)`);
+    console.log(`[Scheduler] Backfill completed: ${inserted}/${allData.length} records inserted (${skipped} filtered/duplicates)`);
 
     return {
       totalFetched: allData.length,
