@@ -155,7 +155,7 @@ export function mapActivity(data: ActivityData[]): HealthDataInput[] {
     // 消費カロリー
     if (item.calories > 0) {
       results.push({
-        dataType: 'huawei:calories_burned',
+        dataType: 'calories_burned',
         value: item.calories,
         unit: 'kcal',
         recordedAt,

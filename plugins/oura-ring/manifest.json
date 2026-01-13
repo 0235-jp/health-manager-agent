@@ -21,7 +21,7 @@
     { "name": "workout_calories", "displayName": "ワークアウトカロリー", "category": "活動", "unit": "kcal" },
     { "name": "session_duration", "displayName": "セッション時間", "category": "精神", "unit": "minutes", "description": "瞑想・リラクゼーション等のセッション時間" },
     { "name": "oura:sleep_score", "displayName": "睡眠スコア", "category": "睡眠", "unit": "score", "description": "Oura独自の睡眠スコア" },
-    { "name": "oura:calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
     { "name": "oura:readiness_score", "displayName": "レディネススコア", "category": "活動", "unit": "score", "description": "Oura独自のレディネススコア" },
     { "name": "oura:activity_score", "displayName": "活動スコア", "category": "活動", "unit": "score", "description": "Oura独自の活動スコア" },
     { "name": "oura:active_calories", "displayName": "アクティブカロリー", "category": "活動", "unit": "kcal" },

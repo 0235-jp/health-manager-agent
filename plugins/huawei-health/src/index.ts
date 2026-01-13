@@ -221,7 +221,7 @@ class HuaweiHealthPlugin implements DataSourcePlugin {
 
     try {
       // 活動（カロリー、距離など）
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['huawei:calories_burned', 'huawei:active_calories', 'huawei:bmr_calories', 'huawei:distance', 'huawei:floors_climbed'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['calories_burned', 'huawei:active_calories', 'huawei:bmr_calories', 'huawei:distance', 'huawei:floors_climbed'])) {
         const activity = await this.client.getActivity(startDate, endDate);
         allData.push(...mapActivity(activity));
       }

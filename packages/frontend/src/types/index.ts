@@ -28,12 +28,27 @@ export interface ExcludedPeriod {
   enabled: boolean;
 }
 
+/** ユーザープロファイル */
+export interface UserProfile {
+  /** 生年月日 (YYYY-MM-DD 形式) */
+  birthDate?: string;
+  /** 身長 (cm) */
+  height?: number;
+  /** 性別 */
+  sex?: 'male' | 'female' | 'other';
+  /** 持病 */
+  medicalConditions?: string[];
+  /** アレルギー */
+  allergies?: string[];
+}
+
 export interface Settings {
   collection_interval: number;
   timezone: string;
   active_plugins: string[];
   data_source_priority: Record<string, string>;
   report_excluded_periods: ExcludedPeriod[];
+  user_profile?: UserProfile;
 }
 
 export interface ApiError {

@@ -10,7 +10,7 @@
   "supportedDataTypes": [
     { "name": "steps", "displayName": "歩数", "category": "活動", "unit": "count" },
     { "name": "huawei:distance", "displayName": "移動距離", "category": "活動", "unit": "meters" },
-    { "name": "huawei:calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
     { "name": "huawei:active_calories", "displayName": "アクティブカロリー", "category": "活動", "unit": "kcal" },
     { "name": "huawei:bmr_calories", "displayName": "基礎代謝カロリー", "category": "活動", "unit": "kcal" },
     { "name": "workout_duration", "displayName": "ワークアウト時間", "category": "活動", "unit": "minutes" },

@@ -140,7 +140,7 @@ export function mapDailyActivity(data: DailyActivityData[]): HealthDataInput[] {
 
     // 消費カロリー
     results.push({
-      dataType: 'oura:calories_burned',
+      dataType: 'calories_burned',
       value: item.total_calories,
       unit: 'kcal',
       recordedAt,

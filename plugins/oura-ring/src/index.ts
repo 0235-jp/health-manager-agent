@@ -158,7 +158,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Daily Activity
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['steps', 'oura:calories_burned', 'oura:activity_score', 'oura:active_calories'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['steps', 'calories_burned', 'oura:activity_score', 'oura:active_calories'])) {
         const activity = await this.client.getDailyActivity(startDate, endDate);
         allData.push(...mapDailyActivity(activity));
       }

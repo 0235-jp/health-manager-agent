@@ -35,6 +35,7 @@ export function seedInitialData(): void {
     { name: 'steps', display_name: '歩数', category: '活動', unit: 'count' },
     { name: 'workout_duration', display_name: 'ワークアウト時間', category: '活動', unit: 'minutes' },
     { name: 'workout_calories', display_name: 'ワークアウトカロリー', category: '活動', unit: 'kcal' },
+    { name: 'calories_burned', display_name: '消費カロリー', category: '活動', unit: 'kcal' },
 
     // 体温
     { name: 'body_temperature', display_name: '体温', category: '体温', unit: '°C' },

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
 import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
-import type { CustomInstruction, ExcludedPeriod } from '../types';
+import type { CustomInstruction, ExcludedPeriod, UserProfile } from '../types';
 
 interface SettingsFormData {
   collection_interval: number;
@@ -440,6 +440,227 @@ function ReportExcludedPeriodsSection(): ReactElement {
   );
 }
 
+const SEX_OPTIONS = [
+  { value: '', label: '未設定' },
+  { value: 'male', label: '男性' },
+  { value: 'female', label: '女性' },
+  { value: 'other', label: 'その他' },
+];
+
+interface TagInputProps {
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+}
+
+function TagInput({ value, onChange, placeholder }: TagInputProps): ReactElement {
+  const [inputValue, setInputValue] = useState('');
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    const trimmedInput = inputValue.trim();
+
+    if (e.key === 'Enter' && trimmedInput) {
+      e.preventDefault();
+      if (!value.includes(trimmedInput)) {
+        onChange([...value, trimmedInput]);
+      }
+      setInputValue('');
+      return;
+    }
+
+    if (e.key === 'Backspace' && !inputValue && value.length > 0) {
+      onChange(value.slice(0, -1));
+    }
+  }
+
+  function handleRemove(tag: string): void {
+    onChange(value.filter((t) => t !== tag));
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      />
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {value.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-md"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => handleRemove(tag)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-gray-500">Enterで追加、Backspaceで削除</p>
+    </div>
+  );
+}
+
+const PROFILE_INPUT_CLASS =
+  'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+function UserProfileSection(): ReactElement {
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  });
+
+  const [editedProfile, setEditedProfile] = useState<UserProfile | null>(null);
+
+  const savedProfile = settings?.user_profile ?? {};
+  const isEditing = editedProfile !== null;
+  const displayProfile = editedProfile ?? savedProfile;
+
+  const updateMutation = useMutation({
+    mutationFn: (profile: UserProfile) =>
+      api.settings.update({ user_profile: profile }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setEditedProfile(null);
+    },
+  });
+
+  function handleChange<K extends keyof UserProfile>(field: K, value: UserProfile[K]): void {
+    const current = editedProfile ?? { ...savedProfile };
+    setEditedProfile({ ...current, [field]: value });
+  }
+
+  function handleSave(): void {
+    if (editedProfile) {
+      updateMutation.mutate(editedProfile);
+    }
+  }
+
+  function handleCancel(): void {
+    setEditedProfile(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            生年月日
+          </label>
+          <input
+            type="date"
+            value={displayProfile.birthDate ?? ''}
+            onChange={(e) => handleChange('birthDate', e.target.value || undefined)}
+            className={PROFILE_INPUT_CLASS}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            身長 (cm)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="300"
+            step="0.1"
+            value={displayProfile.height ?? ''}
+            onChange={(e) =>
+              handleChange('height', e.target.value ? parseFloat(e.target.value) : undefined)
+            }
+            placeholder="例: 170"
+            className={PROFILE_INPUT_CLASS}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            性別
+          </label>
+          <select
+            value={displayProfile.sex ?? ''}
+            onChange={(e) =>
+              handleChange('sex', (e.target.value || undefined) as UserProfile['sex'])
+            }
+            className={PROFILE_INPUT_CLASS}
+          >
+            {SEX_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          持病
+        </label>
+        <TagInput
+          value={displayProfile.medicalConditions ?? []}
+          onChange={(v) => handleChange('medicalConditions', v)}
+          placeholder="例: 高血圧、糖尿病"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          アレルギー
+        </label>
+        <TagInput
+          value={displayProfile.allergies ?? []}
+          onChange={(v) => handleChange('allergies', v)}
+          placeholder="例: 花粉症、卵"
+        />
+      </div>
+
+      {isEditing && (
+        <div className="flex gap-2 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {updateMutation.isPending ? '保存中...' : '保存'}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={updateMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border rounded-md hover:bg-gray-50"
+          >
+            キャンセル
+          </button>
+        </div>
+      )}
+
+      {updateMutation.isSuccess && !isEditing && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+          プロファイルを保存しました
+        </div>
+      )}
+
+      {updateMutation.isError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          エラー: {(updateMutation.error as Error).message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CustomInstructionsSection(): ReactElement {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -597,6 +818,16 @@ export function Settings(): ReactElement {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">設定</h2>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-2 text-lg font-medium text-gray-800">
+          ユーザープロファイル
+        </h3>
+        <p className="mb-4 text-sm text-gray-600">
+          基本情報を設定することで、より正確な健康分析が可能になります。
+        </p>
+        <UserProfileSection />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
