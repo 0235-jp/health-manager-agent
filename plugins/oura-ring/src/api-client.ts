@@ -210,17 +210,6 @@ export interface RestModePeriodData {
   }>;
 }
 
-// Ring Configuration Response
-export interface RingConfigurationData {
-  id: string;
-  color: string | null;
-  design: string | null;
-  firmware_version: string | null;
-  hardware_type: string | null;
-  set_up_at: string | null;
-  size: number | null;
-}
-
 /**
  * Oura API v2 クライアント
  */
@@ -516,13 +505,6 @@ export class OuraApiClient {
       'rest_mode_period',
       this.getDateParams(startDate, endDate)
     );
-  }
-
-  /**
-   * Ring Configurationを取得
-   */
-  async getRingConfiguration(): Promise<RingConfigurationData[]> {
-    return this.fetch<RingConfigurationData>('ring_configuration', {});
   }
 
   /**

@@ -80,12 +80,6 @@ export interface BasePlugin {
    * リソースの解放
    */
   dispose(): Promise<void>;
-
-  /**
-   * 設定のバリデーション（オプション）
-   * @param config 検証する設定値
-   */
-  validateConfig?(config: Record<string, unknown>): Promise<ValidationResult>;
 }
 
 /**

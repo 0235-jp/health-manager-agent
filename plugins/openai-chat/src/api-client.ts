@@ -201,8 +201,9 @@ export class OpenAIApiClient {
                 }
               }
             }
-          } catch {
-            // JSON parse error, skip
+          } catch (error) {
+            // JSON parse error during streaming - may occur with incomplete chunks
+            console.debug('[OpenAI] JSON parse error in stream:', error);
           }
         }
       }

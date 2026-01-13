@@ -274,10 +274,7 @@ pluginsRouter.put('/agent/current', async (req, res) => {
     }
 
     const pluginManager = PluginManager.getInstance();
-    pluginManager.setCurrentAgent(name);
-
-    // DBにも保存
-    pluginsRepository.setCurrentAgentName(name);
+    await pluginManager.setCurrentAgent(name);
 
     res.json({ success: true, currentAgent: name });
   } catch (error) {
@@ -398,8 +395,8 @@ pluginsRouter.post('/install', upload.single('plugin'), async (req, res) => {
     if (uploadedFile) {
       try {
         fs.unlinkSync(uploadedFile.path);
-      } catch {
-        // ignore cleanup errors
+      } catch (error) {
+        console.error('[PluginsAPI] Failed to cleanup temp file:', error);
       }
     }
   }
@@ -490,8 +487,8 @@ pluginsRouter.post('/:name/load', async (req, res) => {
 
     const pluginManager = PluginManager.getInstance();
 
-    // プラグインディレクトリからロード（PluginLoaderと同じパスを使用）
-    const pluginsDir = pluginManager.getLoader().getPluginsDir();
+    // プラグインディレクトリからロード
+    const pluginsDir = pluginManager.getPluginsDir();
     const pluginDir = path.join(pluginsDir, name);
     if (!fs.existsSync(pluginDir)) {
       res.status(404).json({ error: 'Plugin directory not found' });

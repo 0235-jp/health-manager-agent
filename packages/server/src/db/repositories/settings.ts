@@ -16,14 +16,15 @@ export const settingsRepository = {
     for (const row of rows) {
       try {
         settings[row.key] = JSON.parse(row.value);
-      } catch {
+      } catch (error) {
+        console.warn(`[SettingsRepository] Failed to parse JSON for '${row.key}':`, error);
         settings[row.key] = row.value;
       }
     }
     return settings;
   },
 
-  get(key: string): unknown | undefined {
+  get(key: string): unknown {
     const db = getDatabase();
     const stmt = db.prepare('SELECT value FROM settings WHERE key = ?');
     const row = stmt.get(key) as { value: string } | undefined;
@@ -32,7 +33,8 @@ export const settingsRepository = {
 
     try {
       return JSON.parse(row.value);
-    } catch {
+    } catch (error) {
+      console.warn(`[SettingsRepository] Failed to parse JSON for '${key}':`, error);
       return row.value;
     }
   },

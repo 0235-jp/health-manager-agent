@@ -97,36 +97,4 @@ export const pluginCollectionStateRepository = {
       consecutiveFailures: (current?.consecutive_failures || 0) + 1,
     });
   },
-
-  /**
-   * 失敗カウンタをリセット
-   */
-  resetFailures(pluginName: string): void {
-    const db = getDatabase();
-    const stmt = db.prepare(`
-      UPDATE plugin_collection_state
-      SET consecutive_failures = 0, updated_at = CURRENT_TIMESTAMP
-      WHERE plugin_name = ?
-    `);
-    stmt.run(pluginName);
-  },
-
-  /**
-   * プラグインの状態を削除
-   */
-  delete(pluginName: string): boolean {
-    const db = getDatabase();
-    const stmt = db.prepare('DELETE FROM plugin_collection_state WHERE plugin_name = ?');
-    const result = stmt.run(pluginName);
-    return result.changes > 0;
-  },
-
-  /**
-   * すべての状態をクリア
-   */
-  clear(): void {
-    const db = getDatabase();
-    const stmt = db.prepare('DELETE FROM plugin_collection_state');
-    stmt.run();
-  },
 };

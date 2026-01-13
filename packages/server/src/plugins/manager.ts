@@ -72,17 +72,6 @@ export class PluginManager {
   }
 
   /**
-   * テスト用: インスタンスをリセット
-   */
-  static resetInstance(): void {
-    if (PluginManager.instance) {
-      PluginManager.instance.eventBus.clear();
-      PluginManager.instance.registry.clear();
-    }
-    PluginManager.instance = null;
-  }
-
-  /**
    * プラグインマネージャーを初期化
    * サーバー起動時に呼び出す
    */
@@ -576,17 +565,10 @@ export class PluginManager {
   }
 
   /**
-   * EventBusを取得（テスト用）
+   * プラグインディレクトリのパスを取得
    */
-  getEventBus(): EventBus {
-    return this.eventBus;
-  }
-
-  /**
-   * ローダーを取得（テスト用）
-   */
-  getLoader(): PluginLoader {
-    return this.loader;
+  getPluginsDir(): string {
+    return this.pluginsDir;
   }
 
   /**

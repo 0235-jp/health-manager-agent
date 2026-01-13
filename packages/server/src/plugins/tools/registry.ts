@@ -23,13 +23,6 @@ export class ToolRegistry {
   }
 
   /**
-   * Unregister a tool by name
-   */
-  unregister(name: string): boolean {
-    return this.tools.delete(name);
-  }
-
-  /**
    * Get a registered tool by name
    */
   get(name: string): RegisteredTool | undefined {

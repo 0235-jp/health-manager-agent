@@ -94,17 +94,9 @@ class HuaweiHealthPlugin implements DataSourcePlugin {
 
   private client: HuaweiHealthApiClient | null = null;
   private config: Record<string, unknown> = {};
-  private onConfigUpdate?: (config: Record<string, unknown>) => void;
 
   constructor(manifest: DataSourceManifest) {
     this.manifest = manifest;
-  }
-
-  /**
-   * 設定更新時のコールバックを設定
-   */
-  setConfigUpdateCallback(callback: (config: Record<string, unknown>) => void): void {
-    this.onConfigUpdate = callback;
   }
 
   async initialize(context: PluginContext): Promise<void> {
@@ -131,10 +123,6 @@ class HuaweiHealthPlugin implements DataSourcePlugin {
         this.config.accessToken = tokenInfo.accessToken;
         this.config.refreshToken = tokenInfo.refreshToken;
         this.config.tokenExpiresAt = tokenInfo.expiresAt;
-
-        if (this.onConfigUpdate) {
-          this.onConfigUpdate(this.config);
-        }
       });
 
       console.log('[HuaweiHealthPlugin] Initialized with client credentials');

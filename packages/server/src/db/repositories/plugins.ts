@@ -42,7 +42,8 @@ export interface PluginUpdateInput {
 function parseConfig(config: string): Record<string, unknown> {
   try {
     return JSON.parse(config);
-  } catch {
+  } catch (error) {
+    console.warn('[PluginsRepository] Failed to parse plugin config:', error);
     return {};
   }
 }

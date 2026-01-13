@@ -89,11 +89,4 @@ export class DefaultToolExecutor implements ToolExecutor {
   hasTool(name: string): boolean {
     return this.registry.has(name);
   }
-
-  /**
-   * Get the underlying registry (for testing purposes)
-   */
-  getRegistry(): ToolRegistry {
-    return this.registry;
-  }
 }

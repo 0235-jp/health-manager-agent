@@ -2,7 +2,6 @@ import { createApp } from './app.js';
 import { config } from './config/index.js';
 import { initializeSchema } from './db/schema.js';
 import { seedInitialData } from './db/seed.js';
-import { AgentService } from './agent/index.js';
 import { PluginManager } from './plugins/manager.js';
 import { getScheduler } from './scheduler/index.js';
 import path from 'path';
@@ -17,11 +16,6 @@ async function main(): Promise<void> {
   const pluginManager = PluginManager.getInstance(pluginsDir);
   await pluginManager.initialize();
   console.log('Plugin manager initialized');
-
-  // Initialize agent service (now delegates to PluginManager)
-  const agentService = AgentService.getInstance();
-  await agentService.initialize();
-  console.log('Agent service initialized');
 
   // Start scheduler
   const scheduler = getScheduler();
@@ -40,7 +34,6 @@ async function main(): Promise<void> {
     console.log(`\n${signal} received. Starting graceful shutdown...`);
 
     await scheduler.stop();
-    await agentService.dispose();
     await pluginManager.dispose();
 
     server.close(() => {

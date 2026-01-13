@@ -78,14 +78,11 @@ export class EventBus {
     );
 
     // エラーをログに記録（他のハンドラは継続）
-    results.forEach((result, index) => {
+    for (const result of results) {
       if (result.status === 'rejected') {
-        console.error(
-          `[EventBus] Handler ${index} failed for event ${event.type}:`,
-          result.reason
-        );
+        console.error(`[EventBus] Handler failed for event ${event.type}:`, result.reason);
       }
-    });
+    }
   }
 
   /**
@@ -93,19 +90,5 @@ export class EventBus {
    */
   clear(): void {
     this.handlers.clear();
-  }
-
-  /**
-   * 登録されているハンドラ数を取得（デバッグ用）
-   */
-  getHandlerCount(eventType?: NotificationEventType): number {
-    if (eventType) {
-      return this.handlers.get(eventType)?.size ?? 0;
-    }
-
-    return Array.from(this.handlers.values()).reduce(
-      (total, handlers) => total + handlers.size,
-      0
-    );
   }
 }
