@@ -6,7 +6,7 @@ import { formatForDateTimeLocal, dateTimeLocalToISO } from '../../lib/date-utils
 import { useTimezone } from '../../contexts/SettingsContext';
 
 const STANDARD_DATA_TYPES = [
-  { value: 'weight', label: '体重', unit: 'kg' },
+  { value: 'body_weight', label: '体重', unit: 'kg' },
   { value: 'sleep_duration', label: '睡眠時間', unit: 'hours' },
   { value: 'steps', label: '歩数', unit: 'count' },
   { value: 'heart_rate', label: '心拍数', unit: 'bpm' },
@@ -25,7 +25,7 @@ interface DataFormProps {
 
 export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps) {
   const timezone = useTimezone();
-  const [dataType, setDataType] = useState('weight');
+  const [dataType, setDataType] = useState('body_weight');
   const [value, setValue] = useState('');
   const [unit, setUnit] = useState('kg');
   const [recordedAt, setRecordedAt] = useState('');
@@ -41,7 +41,7 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
       setUnit(editData.unit ?? '');
       setRecordedAt(formatForDateTimeLocal(editData.recorded_at, timezone));
     } else {
-      setDataType('weight');
+      setDataType('body_weight');
       setValue('');
       setUnit('kg');
       setRecordedAt(formatForDateTimeLocal(new Date().toISOString(), timezone));
