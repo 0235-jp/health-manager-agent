@@ -27,17 +27,48 @@ export const customInstructionCreateSchema = z.object({
 export const customInstructionUpdateSchema = customInstructionCreateSchema.partial();
 
 export const reportQuerySchema = z.object({
-  report_type: z.enum(['on_fetch', 'daily']).optional(),
+  report_type: z.enum(['on_fetch', 'daily', 'manual']).optional(),
   start_date: z.string().datetime().optional(),
   end_date: z.string().datetime().optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),
   offset: z.coerce.number().int().nonnegative().default(0),
 });
 
-export const generateReportSchema = z.object({
-  report_type: z.enum(['on_fetch', 'daily']),
-  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
+// datetime-local形式: YYYY-MM-DDTHH:mm (時間は1桁または2桁)
+const datetimeLocalRegex = /^\d{4}-\d{2}-\d{2}T\d{1,2}:\d{2}$/;
+
+export const generateReportSchema = z
+  .object({
+    report_type: z.enum(['on_fetch', 'daily', 'manual']),
+    target_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    start_datetime: z.string().regex(datetimeLocalRegex).optional(),
+    end_datetime: z.string().regex(datetimeLocalRegex).optional(),
+  })
+  .refine(
+    (data) => {
+      // manual タイプの場合は start_datetime と end_datetime が必須
+      if (data.report_type === 'manual') {
+        return data.start_datetime && data.end_datetime;
+      }
+      return true;
+    },
+    { message: 'manual report requires start_datetime and end_datetime' }
+  )
+  .refine(
+    (data) => {
+      // start_datetime <= end_datetime のバリデーション（日時として比較）
+      if (data.start_datetime && data.end_datetime) {
+        const start = new Date(data.start_datetime);
+        const end = new Date(data.end_datetime);
+        return start <= end;
+      }
+      return true;
+    },
+    { message: 'start_datetime must be before or equal to end_datetime' }
+  );
 
 // チャット用スキーマ
 export const chatMessageSchema = z.object({

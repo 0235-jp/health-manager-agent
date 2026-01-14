@@ -4,15 +4,16 @@ import { api } from '../lib/api';
 import { Markdown } from '../components/Markdown';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
 import { useTimezone } from '../contexts/SettingsContext';
-import { formatDateTime, formatPeriod as formatPeriodUtil } from '../lib/date-utils';
-import type { Report } from '../types';
+import { formatDateTime, formatPeriod, getTodayDatetimeRange } from '../lib/date-utils';
+import type { Report, ReportType } from '../types';
 
-type ReportFilter = 'all' | 'daily' | 'on_fetch';
+type ReportFilter = 'all' | 'daily' | 'on_fetch' | 'manual';
 
-function ReportTypeBadge({ type }: { type: 'on_fetch' | 'daily' }): ReactElement {
+function ReportTypeBadge({ type }: { type: ReportType }): ReactElement {
   const config = {
     daily: { label: '日次', bgColor: 'bg-blue-100', textColor: 'text-blue-800' },
     on_fetch: { label: '定期', bgColor: 'bg-green-100', textColor: 'text-green-800' },
+    manual: { label: '手動', bgColor: 'bg-purple-100', textColor: 'text-purple-800' },
   };
   const { label, bgColor, textColor } = config[type];
 
@@ -44,7 +45,12 @@ function ReportCard({ report, onDelete, isDeleting }: ReportCardProps): ReactEle
             <div className="flex items-center gap-2">
               <ReportTypeBadge type={report.report_type} />
               <span className="text-sm text-gray-500">
-                {formatPeriodUtil(report.period_start, report.period_end, timezone)}
+                {formatPeriod(
+                  report.period_start,
+                  report.period_end,
+                  timezone,
+                  report.report_type !== 'daily'
+                )}
               </span>
             </div>
             <Markdown className="mt-2 text-gray-700">{content.summary}</Markdown>
@@ -125,7 +131,10 @@ function ReportCard({ report, onDelete, isDeleting }: ReportCardProps): ReactEle
 
 export function Reports(): ReactElement {
   const [filter, setFilter] = useState<ReportFilter>('all');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerateFormOpen, setIsGenerateFormOpen] = useState(false);
+  const timezone = useTimezone();
+  const [startDatetime, setStartDatetime] = useState(() => getTodayDatetimeRange(timezone).start);
+  const [endDatetime, setEndDatetime] = useState(() => getTodayDatetimeRange(timezone).end);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -138,13 +147,15 @@ export function Reports(): ReactElement {
   });
 
   const generateMutation = useMutation({
-    mutationFn: () => api.reports.generate({ report_type: 'daily' }),
+    mutationFn: () =>
+      api.reports.generate({
+        report_type: 'manual',
+        start_datetime: startDatetime,
+        end_datetime: endDatetime,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports'] });
-      setIsGenerating(false);
-    },
-    onError: () => {
-      setIsGenerating(false);
+      setIsGenerateFormOpen(false);
     },
   });
 
@@ -154,11 +165,6 @@ export function Reports(): ReactElement {
       queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
   });
-
-  const handleGenerate = (): void => {
-    setIsGenerating(true);
-    generateMutation.mutate();
-  };
 
   const handleDelete = (id: number): void => {
     if (confirm('このレポートを削除しますか？')) {
@@ -170,6 +176,7 @@ export function Reports(): ReactElement {
     { value: 'all', label: 'すべて' },
     { value: 'daily', label: '日次' },
     { value: 'on_fetch', label: '定期' },
+    { value: 'manual', label: '手動' },
   ];
 
   return (
@@ -177,28 +184,83 @@ export function Reports(): ReactElement {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800">レポート</h2>
         <button
-          onClick={handleGenerate}
-          disabled={isGenerating || generateMutation.isPending}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          onClick={() => setIsGenerateFormOpen(!isGenerateFormOpen)}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          {isGenerating || generateMutation.isPending ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              生成中...
-            </>
-          ) : (
-            <>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              日次レポートを生成
-            </>
-          )}
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          レポートを生成
         </button>
       </div>
+
+      {/* 生成フォーム */}
+      {isGenerateFormOpen && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  開始日時
+                </label>
+                <input
+                  type="datetime-local"
+                  value={startDatetime}
+                  onChange={(e) => setStartDatetime(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={generateMutation.isPending}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  終了日時
+                </label>
+                <input
+                  type="datetime-local"
+                  value={endDatetime}
+                  min={startDatetime}
+                  onChange={(e) => setEndDatetime(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={generateMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    生成中...
+                  </>
+                ) : (
+                  '生成'
+                )}
+              </button>
+              <button
+                onClick={() => setIsGenerateFormOpen(false)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                disabled={generateMutation.isPending}
+              >
+                キャンセル
+              </button>
+            </div>
+
+            {generateMutation.isError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                レポートの生成に失敗しました: {(generateMutation.error as Error).message}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2">
         {filters.map(({ value, label }) => (
@@ -215,12 +277,6 @@ export function Reports(): ReactElement {
           </button>
         ))}
       </div>
-
-      {generateMutation.isError && (
-        <div className="rounded-lg bg-red-50 p-4 text-red-700">
-          レポートの生成に失敗しました。しばらくしてから再試行してください。
-        </div>
-      )}
 
       {isLoading ? (
         <div className="space-y-4">
@@ -243,7 +299,7 @@ export function Reports(): ReactElement {
       ) : data?.data.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-gray-500">
           <p>レポートがありません</p>
-          <p className="mt-2 text-sm">「日次レポートを生成」ボタンをクリックしてレポートを作成してください</p>
+          <p className="mt-2 text-sm">「レポートを生成」ボタンをクリックしてレポートを作成してください</p>
         </div>
       ) : (
         <div className="space-y-4">

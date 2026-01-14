@@ -77,3 +77,38 @@ function formatOffset(offsetMinutes: number): string {
 export function nowUTC(): string {
   return new Date().toISOString();
 }
+
+/**
+ * datetime-local形式の文字列を、指定タイムゾーンの時刻としてDateオブジェクトに変換
+ *
+ * @param datetimeLocal datetime-local形式 (YYYY-MM-DDTHH:mm)
+ * @param timezone タイムゾーン名 (例: 'Asia/Tokyo')
+ * @returns Dateオブジェクト
+ *
+ * 例: datetimeLocalToDate('2026-01-02T09:00', 'Asia/Tokyo')
+ *     → JST 2026-01-02 09:00:00 のDateオブジェクト（内部的にはUTC 2026-01-02 00:00:00）
+ */
+export function datetimeLocalToDate(datetimeLocal: string, timezone: string): Date {
+  // datetime-local形式: YYYY-MM-DDTHH:mm (時間は1桁または2桁)
+  const match = datetimeLocal.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    throw new Error(
+      `無効なdatetime-local形式: "${datetimeLocal}"。"YYYY-MM-DDTHH:mm" 形式を使用してください`
+    );
+  }
+
+  const [, year, month, day, hour, minute] = match;
+
+  // 指定日時をUTCとして仮のDateを作成（オフセット計算用）
+  const tempDate = new Date(Date.UTC(
+    parseInt(year),
+    parseInt(month) - 1,
+    parseInt(day),
+    parseInt(hour),
+    parseInt(minute)
+  ));
+
+  // 指定タイムゾーンのオフセット（分）を取得し、UTCに変換
+  const offsetMinutes = getTimezoneOffset(tempDate, timezone);
+  return new Date(tempDate.getTime() - offsetMinutes * 60000);
+}

@@ -82,3 +82,20 @@ const mutation = useMutation({
 - TailwindCSS ユーティリティクラスを使用
 - レスポンシブ: `md:`, `lg:` プレフィックス
 - カラーパレット: blue-600（primary）, gray-*（neutral）
+
+## タイムゾーン処理
+
+**重要**: 日時を扱う際は、ブラウザのローカルタイムゾーンではなく、ユーザー設定のタイムゾーンを使用する。
+
+```typescript
+// ✓ 正しい: useTimezone() で設定タイムゾーンを取得して使用
+const timezone = useTimezone();
+const range = getTodayDatetimeRange(timezone);
+const formattedDate = formatDateTime(dateString, timezone);
+
+// ✗ 誤り: ブラウザのローカルタイムゾーンを暗黙的に使用
+const now = new Date();
+const today = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+```
+
+**理由**: サーバーはユーザー設定のタイムゾーン（`settings.timezone`）で日時を解釈するため、フロントエンドでも同じタイムゾーンを使用しないと不整合が発生する。

@@ -32,7 +32,7 @@ export interface AgentManifest extends PluginManifest {
  */
 export interface GenerateReportParams {
   /** レポートタイプ */
-  reportType: 'on_fetch' | 'daily';
+  reportType: 'on_fetch' | 'daily' | 'manual';
   /** 評価対象期間の開始 */
   periodStart: Date;
   /** 評価対象期間の終了 */

@@ -60,13 +60,16 @@ export function formatDate(
 
 /**
  * 期間を指定タイムゾーンでフォーマット
+ * @param includeTime - true の場合は時刻も含める
  */
 export function formatPeriod(
   start: string | Date,
   end: string | Date,
-  timezone: string = DEFAULT_TIMEZONE
+  timezone: string = DEFAULT_TIMEZONE,
+  includeTime: boolean = false
 ): string {
-  return `${formatDate(start, timezone)} - ${formatDate(end, timezone)}`;
+  const formatter = includeTime ? formatDateTime : formatDate;
+  return `${formatter(start, timezone)} - ${formatter(end, timezone)}`;
 }
 
 /**
@@ -146,4 +149,28 @@ export function dateTimeLocalToISO(
 
   // localValue をパースして、オフセットを引いて UTC に変換
   return new Date(localDate.getTime() - offsetMs).toISOString();
+}
+
+/**
+ * 指定タイムゾーンでの「今日」の日付範囲をdatetime-local形式で取得（00:00から23:59）
+ *
+ * @param timezone タイムゾーン名（例: 'Asia/Tokyo'）
+ * @returns datetime-local形式の開始・終了時刻
+ */
+export function getTodayDatetimeRange(timezone: string): { start: string; end: string } {
+  const now = new Date();
+
+  // 指定タイムゾーンでの「今日」を取得
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const datePrefix = formatter.format(now); // "2026-01-14" 形式
+
+  return {
+    start: `${datePrefix}T00:00`,
+    end: `${datePrefix}T23:59`,
+  };
 }

@@ -2,9 +2,11 @@ import { getDatabase } from '../index.js';
 import type { ReportContent } from '../../plugins/interfaces/agent.js';
 import { nowUTC } from '../../utils/datetime.js';
 
+export type ReportType = 'on_fetch' | 'daily' | 'manual';
+
 export interface ReportRecord {
   id: number;
-  report_type: 'on_fetch' | 'daily';
+  report_type: ReportType;
   period_start: string;
   period_end: string;
   content: string;
@@ -16,7 +18,7 @@ export interface ReportWithContent extends Omit<ReportRecord, 'content'> {
 }
 
 export interface ReportQuery {
-  report_type?: 'on_fetch' | 'daily';
+  report_type?: ReportType;
   start_date?: string;
   end_date?: string;
   limit: number;
@@ -24,7 +26,7 @@ export interface ReportQuery {
 }
 
 export interface CreateReportParams {
-  reportType: 'on_fetch' | 'daily';
+  reportType: ReportType;
   periodStart: string;
   periodEnd: string;
   content: ReportContent;
@@ -102,7 +104,7 @@ export const reportsRepository = {
     return record ? parseReportContent(record) : undefined;
   },
 
-  findLatest(reportType?: 'on_fetch' | 'daily'): ReportWithContent | undefined {
+  findLatest(reportType?: ReportType): ReportWithContent | undefined {
     const db = getDatabase();
     const whereClause = reportType ? 'WHERE report_type = ?' : '';
     const stmt = db.prepare(`

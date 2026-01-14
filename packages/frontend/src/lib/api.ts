@@ -166,7 +166,7 @@ export const api = {
       return fetchJson(`/reports/${id}`);
     },
 
-    getLatest(reportType?: 'on_fetch' | 'daily'): Promise<Report> {
+    getLatest(reportType?: 'on_fetch' | 'daily' | 'manual'): Promise<Report> {
       const query = reportType ? `?report_type=${reportType}` : '';
       return fetchJson(`/reports/latest${query}`);
     },
@@ -348,7 +348,7 @@ function parseSSEData(jsonStr: string): ChatStreamEvent | null {
 // Scheduler API types
 
 interface ReportListParams {
-  report_type?: 'on_fetch' | 'daily';
+  report_type?: 'on_fetch' | 'daily' | 'manual';
   start_date?: string;
   end_date?: string;
   limit?: number;

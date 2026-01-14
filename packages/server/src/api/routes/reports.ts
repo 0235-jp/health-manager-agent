@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request } from 'express';
-import { reportsRepository } from '../../db/repositories/reports.js';
+import { reportsRepository, type ReportType } from '../../db/repositories/reports.js';
+import { settingsRepository } from '../../db/repositories/settings.js';
 import { PluginManager } from '../../plugins/manager.js';
 import { asyncHandler } from '../middlewares/async-handler.js';
 import { validateQuery, validateBody } from '../middlewares/validation.js';
@@ -10,6 +11,7 @@ import {
   type ReportQuery,
   type GenerateReport,
 } from '../validators/schemas.js';
+import { datetimeLocalToDate, DEFAULT_TIMEZONE } from '../../utils/datetime.js';
 
 export const reportsRouter = Router();
 
@@ -32,7 +34,7 @@ reportsRouter.get(
 reportsRouter.get(
   '/latest',
   asyncHandler((req, res) => {
-    const reportType = req.query.report_type as 'on_fetch' | 'daily' | undefined;
+    const reportType = req.query.report_type as ReportType | undefined;
     const report = reportsRepository.findLatest(reportType);
 
     if (!report) {
@@ -62,12 +64,20 @@ reportsRouter.post(
   '/generate',
   validateBody(generateReportSchema),
   asyncHandler(async (req, res) => {
-    const { report_type, target_date } = req.body as GenerateReport;
+    const { report_type, target_date, start_datetime, end_datetime } =
+      req.body as GenerateReport;
 
     let periodStart: Date;
     let periodEnd: Date;
 
-    if (target_date) {
+    if (report_type === 'manual') {
+      // manual: ユーザー設定のタイムゾーンで日時を解釈
+      const settings = settingsRepository.getAll();
+      const timezone = (settings.timezone as string) || DEFAULT_TIMEZONE;
+
+      periodStart = datetimeLocalToDate(start_datetime!, timezone);
+      periodEnd = datetimeLocalToDate(end_datetime!, timezone);
+    } else if (target_date) {
       periodStart = new Date(target_date);
       periodStart.setHours(0, 0, 0, 0);
       periodEnd = new Date(target_date);

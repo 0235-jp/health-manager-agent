@@ -100,9 +100,11 @@ export interface ReportContent {
   recommendations: string[];
 }
 
+export type ReportType = 'on_fetch' | 'daily' | 'manual';
+
 export interface Report {
   id: number;
-  report_type: 'on_fetch' | 'daily';
+  report_type: ReportType;
   period_start: string;
   period_end: string;
   content: ReportContent;
@@ -110,8 +112,12 @@ export interface Report {
 }
 
 export interface GenerateReportInput {
-  report_type: 'on_fetch' | 'daily';
+  report_type: ReportType;
   target_date?: string;
+  /** datetime-local形式 (YYYY-MM-DDTHH:mm) - manual タイプ用 */
+  start_datetime?: string;
+  /** datetime-local形式 (YYYY-MM-DDTHH:mm) - manual タイプ用 */
+  end_datetime?: string;
 }
 
 // Plugin types
