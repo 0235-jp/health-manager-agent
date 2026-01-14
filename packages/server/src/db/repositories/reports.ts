@@ -1,5 +1,6 @@
 import { getDatabase } from '../index.js';
 import type { ReportContent } from '../../plugins/interfaces/agent.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface ReportRecord {
   id: number;
@@ -120,14 +121,15 @@ export const reportsRepository = {
   create(params: CreateReportParams): ReportWithContent {
     const db = getDatabase();
     const stmt = db.prepare(`
-      INSERT INTO reports (report_type, period_start, period_end, content)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO reports (report_type, period_start, period_end, content, created_at)
+      VALUES (?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       params.reportType,
       params.periodStart,
       params.periodEnd,
-      JSON.stringify(params.content)
+      JSON.stringify(params.content),
+      nowUTC()
     );
     return this.findById(result.lastInsertRowid as number)!;
   },

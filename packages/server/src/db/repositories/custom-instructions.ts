@@ -1,5 +1,6 @@
 import { getDatabase } from '../index.js';
 import type { CustomInstructionCreate, CustomInstructionUpdate } from '../../api/validators/schemas.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface CustomInstructionRecord {
   id: number;
@@ -71,8 +72,8 @@ export const customInstructionsRepository = {
       return this.findById(id);
     }
 
-    const setClauses = [...fieldUpdates.map((u) => `${u.field} = ?`), 'updated_at = CURRENT_TIMESTAMP'];
-    const params = [...fieldUpdates.map((u) => u.value), id];
+    const setClauses = [...fieldUpdates.map((u) => `${u.field} = ?`), 'updated_at = ?'];
+    const params = [...fieldUpdates.map((u) => u.value), nowUTC(), id];
 
     const stmt = db.prepare(`UPDATE custom_instructions SET ${setClauses.join(', ')} WHERE id = ?`);
     stmt.run(...params);
@@ -95,10 +96,10 @@ export const customInstructionsRepository = {
 
     const stmt = db.prepare(`
       UPDATE custom_instructions
-      SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+      SET is_active = ?, updated_at = ?
       WHERE id = ?
     `);
-    stmt.run(current.is_active ? 0 : 1, id);
+    stmt.run(current.is_active ? 0 : 1, nowUTC(), id);
     return this.findById(id);
   },
 };

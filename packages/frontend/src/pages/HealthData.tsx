@@ -2,6 +2,8 @@ import type { ReactElement } from 'react';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { formatDateTime } from '../lib/date-utils';
+import { useTimezone } from '../contexts/SettingsContext';
 import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
 import { DataForm } from '../components/data/DataForm';
 
@@ -22,6 +24,8 @@ function DataTableContent({
   onEdit,
   onDelete,
 }: DataTableContentProps): ReactElement {
+  const timezone = useTimezone();
+
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
   }
@@ -68,7 +72,7 @@ function DataTableContent({
             </td>
             <td className="px-6 py-4 text-sm text-gray-500">{item.source}</td>
             <td className="px-6 py-4 text-sm text-gray-500">
-              {new Date(item.recorded_at).toLocaleString('ja-JP')}
+              {formatDateTime(item.recorded_at, timezone)}
             </td>
             <td className="px-6 py-4 text-right">
               {item.source === 'manual' && (

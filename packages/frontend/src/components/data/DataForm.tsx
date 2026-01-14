@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { HealthData } from '../../types';
 import { api } from '../../lib/api';
+import { formatForDateTimeLocal, dateTimeLocalToISO } from '../../lib/date-utils';
+import { useTimezone } from '../../contexts/SettingsContext';
 
 const STANDARD_DATA_TYPES = [
   { value: 'weight', label: '体重', unit: 'kg' },
@@ -21,6 +23,7 @@ interface DataFormProps {
 }
 
 export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps) {
+  const timezone = useTimezone();
   const [dataType, setDataType] = useState('weight');
   const [value, setValue] = useState('');
   const [unit, setUnit] = useState('kg');
@@ -35,15 +38,15 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
       setDataType(editData.data_type);
       setValue(String(editData.value));
       setUnit(editData.unit ?? '');
-      setRecordedAt(formatDateTimeLocal(editData.recorded_at));
+      setRecordedAt(formatForDateTimeLocal(editData.recorded_at, timezone));
     } else {
       setDataType('weight');
       setValue('');
       setUnit('kg');
-      setRecordedAt(formatDateTimeLocal(new Date().toISOString()));
+      setRecordedAt(formatForDateTimeLocal(new Date().toISOString(), timezone));
     }
     setError(null);
-  }, [editData, isOpen]);
+  }, [editData, isOpen, timezone]);
 
   useEffect(() => {
     const selectedType = STANDARD_DATA_TYPES.find((t) => t.value === dataType);
@@ -51,13 +54,6 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
       setUnit(selectedType.unit);
     }
   }, [dataType, isEditMode]);
-
-  function formatDateTimeLocal(isoString: string): string {
-    const date = new Date(isoString);
-    const offset = date.getTimezoneOffset();
-    const localDate = new Date(date.getTime() - offset * 60 * 1000);
-    return localDate.toISOString().slice(0, 16);
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +70,7 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
         data_type: dataType,
         value: parsedValue,
         unit: unit || undefined,
-        recorded_at: new Date(recordedAt).toISOString(),
+        recorded_at: dateTimeLocalToISO(recordedAt, timezone),
       };
 
       if (isEditMode && editData) {

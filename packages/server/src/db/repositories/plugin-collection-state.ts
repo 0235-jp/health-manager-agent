@@ -5,6 +5,7 @@
  */
 
 import { getDatabase } from '../index.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface PluginCollectionState {
   plugin_name: string;
@@ -46,6 +47,7 @@ export const pluginCollectionStateRepository = {
    */
   upsert(state: PluginCollectionStateInput): PluginCollectionState {
     const db = getDatabase();
+    const now = nowUTC();
     const stmt = db.prepare(`
       INSERT INTO plugin_collection_state (
         plugin_name,
@@ -53,19 +55,21 @@ export const pluginCollectionStateRepository = {
         last_success_time,
         consecutive_failures,
         updated_at
-      ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(plugin_name) DO UPDATE SET
         last_collection_time = excluded.last_collection_time,
         last_success_time = excluded.last_success_time,
         consecutive_failures = excluded.consecutive_failures,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = ?
     `);
 
     stmt.run(
       state.pluginName,
       state.lastCollectionTime?.toISOString() || null,
       state.lastSuccessTime?.toISOString() || null,
-      state.consecutiveFailures
+      state.consecutiveFailures,
+      now,
+      now
     );
 
     return this.get(state.pluginName)!;

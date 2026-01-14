@@ -1,5 +1,6 @@
 import { getDatabase } from '../index.js';
 import type { HealthDataQuery, HealthDataCreate } from '../../api/validators/schemas.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface HealthDataRecord {
   id: number;
@@ -165,8 +166,8 @@ export const healthDataRepository = {
       return this.findById(id);
     }
 
-    const setClauses = [...fieldUpdates.map((u) => `${u.field} = ?`), 'updated_at = CURRENT_TIMESTAMP'];
-    const params = [...fieldUpdates.map((u) => u.value), id];
+    const setClauses = [...fieldUpdates.map((u) => `${u.field} = ?`), 'updated_at = ?'];
+    const params = [...fieldUpdates.map((u) => u.value), nowUTC(), id];
 
     const stmt = db.prepare(`UPDATE health_data SET ${setClauses.join(', ')} WHERE id = ?`);
     stmt.run(...params);

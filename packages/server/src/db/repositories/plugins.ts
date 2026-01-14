@@ -4,6 +4,7 @@
  */
 
 import { getDatabase } from '../index.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface PluginRecord {
   id: number;
@@ -81,7 +82,7 @@ export const pluginsRepository = {
    */
   create(input: PluginCreateInput): PluginRecord {
     const db = getDatabase();
-    const now = new Date().toISOString();
+    const now = nowUTC();
 
     db.prepare(`
       INSERT INTO plugins (name, display_name, version, type, description, supported_data_types, config, is_active, installed_at, updated_at)
@@ -135,7 +136,7 @@ export const pluginsRepository = {
     }
 
     updates.push('updated_at = ?');
-    values.push(new Date().toISOString());
+    values.push(nowUTC());
     values.push(name);
 
     const db = getDatabase();
@@ -195,7 +196,7 @@ export const pluginsRepository = {
     db.prepare(`
       INSERT OR REPLACE INTO settings (key, value, updated_at)
       VALUES ('current_agent', ?, ?)
-    `).run(name, new Date().toISOString());
+    `).run(name, nowUTC());
   },
 
   /**

@@ -2,7 +2,8 @@ import type { ReactElement, FormEvent } from 'react';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
-import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
+import { formatDateForInput, getDateDaysAgo, formatDateTime } from '../lib/date-utils';
+import { useTimezone } from '../contexts/SettingsContext';
 import type { CustomInstruction, ExcludedPeriod, UserProfile } from '../types';
 
 interface SettingsFormData {
@@ -163,6 +164,7 @@ function InstructionItem({
 }
 
 function DataBackfillSection(): ReactElement {
+  const timezone = useTimezone();
   const [startDate, setStartDate] = useState(() => formatDateForInput(getDateDaysAgo(7)));
   const [endDate, setEndDate] = useState(() => formatDateForInput(new Date()));
 
@@ -200,7 +202,7 @@ function DataBackfillSection(): ReactElement {
                 <div className="text-right text-gray-600">
                   {plugin.lastSuccessTime ? (
                     <span>
-                      最終成功: {new Date(plugin.lastSuccessTime).toLocaleString('ja-JP')}
+                      最終成功: {formatDateTime(plugin.lastSuccessTime, timezone)}
                     </span>
                   ) : (
                     <span className="text-gray-400">未取得</span>

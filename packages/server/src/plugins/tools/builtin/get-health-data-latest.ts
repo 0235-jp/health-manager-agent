@@ -4,6 +4,8 @@
 
 import { healthDataRepository } from '../../../db/repositories/health-data.js';
 import { dataTypesRepository } from '../../../db/repositories/data-types.js';
+import { settingsRepository } from '../../../db/repositories/settings.js';
+import { utcToTimezone, DEFAULT_TIMEZONE } from '../../../utils/datetime.js';
 import type { ToolDefinition, ToolResult } from '../interfaces.js';
 
 export const getHealthDataLatestTool: ToolDefinition = {
@@ -32,6 +34,10 @@ export function executeGetHealthDataLatest(
   args: GetHealthDataLatestArgs
 ): ToolResult {
   try {
+    // 設定からタイムゾーンを取得
+    const settings = settingsRepository.getAll();
+    const timezone = (settings.timezone as string) || DEFAULT_TIMEZONE;
+
     let dataTypes = args.data_types ?? [];
 
     // If no data types specified, get all available data types
@@ -49,11 +55,22 @@ export function executeGetHealthDataLatest(
 
     const latestData = healthDataRepository.getLatest(dataTypes);
 
+    // 出力データの日時を設定タイムゾーンに変換
+    const convertedData: Record<string, typeof latestData[string]> = {};
+    for (const [key, item] of Object.entries(latestData)) {
+      convertedData[key] = {
+        ...item,
+        recorded_at: utcToTimezone(item.recorded_at, timezone),
+        created_at: utcToTimezone(item.created_at, timezone),
+        updated_at: utcToTimezone(item.updated_at, timezone),
+      };
+    }
+
     return {
       success: true,
       data: {
-        data: latestData,
-        count: Object.keys(latestData).length,
+        data: convertedData,
+        count: Object.keys(convertedData).length,
       },
     };
   } catch (error) {

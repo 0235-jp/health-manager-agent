@@ -2,7 +2,8 @@ import type { ReactElement, ChangeEvent, FormEvent } from 'react';
 import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
-import { formatDateForInput, getDateDaysAgo } from '../lib/date-utils';
+import { formatDateForInput, getDateDaysAgo, formatDateTime } from '../lib/date-utils';
+import { useTimezone } from '../contexts/SettingsContext';
 import type { Plugin, PluginType, ConfigField, DataTypeDefinition } from '../types';
 
 type TabType = 'all' | PluginType | 'settings';
@@ -359,6 +360,7 @@ interface FetchModalProps {
 }
 
 function FetchModal({ plugin, onClose }: FetchModalProps): ReactElement {
+  const timezone = useTimezone();
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState(() => formatDateForInput(getDateDaysAgo(7)));
   const [endDate, setEndDate] = useState(() => formatDateForInput(new Date()));
@@ -404,7 +406,7 @@ function FetchModal({ plugin, onClose }: FetchModalProps): ReactElement {
                 <p className="text-gray-600">
                   最終成功:{' '}
                   {pluginStatus.lastSuccessTime
-                    ? new Date(pluginStatus.lastSuccessTime).toLocaleString('ja-JP')
+                    ? formatDateTime(pluginStatus.lastSuccessTime, timezone)
                     : '未取得'}
                 </p>
                 {pluginStatus.consecutiveFailures > 0 && (

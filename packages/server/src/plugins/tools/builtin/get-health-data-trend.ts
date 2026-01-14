@@ -4,6 +4,8 @@
 
 import { healthDataRepository } from '../../../db/repositories/health-data.js';
 import { dataTypesRepository } from '../../../db/repositories/data-types.js';
+import { settingsRepository } from '../../../db/repositories/settings.js';
+import { utcToTimezone, DEFAULT_TIMEZONE } from '../../../utils/datetime.js';
 import type { ToolDefinition, ToolResult } from '../interfaces.js';
 
 export const getHealthDataTrendTool: ToolDefinition = {
@@ -37,6 +39,10 @@ export function executeGetHealthDataTrend(
   args: GetHealthDataTrendArgs
 ): ToolResult {
   try {
+    // 設定からタイムゾーンを取得
+    const settings = settingsRepository.getAll();
+    const timezone = (settings.timezone as string) || DEFAULT_TIMEZONE;
+
     let dataTypes = args.data_types ?? [];
     const days = args.days ?? 7;
 
@@ -70,8 +76,8 @@ export function executeGetHealthDataTrend(
         data: trends,
         count: trends.length,
         period: {
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
+          start_date: utcToTimezone(startDate.toISOString(), timezone),
+          end_date: utcToTimezone(endDate.toISOString(), timezone),
           days,
         },
       },

@@ -1,4 +1,5 @@
 import { getDatabase } from '../index.js';
+import { nowUTC } from '../../utils/datetime.js';
 
 export interface SettingsRecord {
   key: string;
@@ -41,29 +42,31 @@ export const settingsRepository = {
 
   set(key: string, value: unknown): void {
     const db = getDatabase();
+    const now = nowUTC();
     const stmt = db.prepare(`
       INSERT INTO settings (key, value, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
         value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = ?
     `);
-    stmt.run(key, JSON.stringify(value));
+    stmt.run(key, JSON.stringify(value), now, now);
   },
 
   updateMultiple(settings: Record<string, unknown>): void {
     const db = getDatabase();
+    const now = nowUTC();
     const stmt = db.prepare(`
       INSERT INTO settings (key, value, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
         value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = ?
     `);
 
     const transaction = db.transaction((entries: [string, unknown][]) => {
       for (const [key, value] of entries) {
-        stmt.run(key, JSON.stringify(value));
+        stmt.run(key, JSON.stringify(value), now, now);
       }
     });
 

@@ -2,6 +2,8 @@ import type { ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { formatDate } from '../lib/date-utils';
+import { useTimezone } from '../contexts/SettingsContext';
 import { LineChart, type ChartDataPoint } from '../components/charts/LineChart';
 import { Markdown } from '../components/Markdown';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
@@ -57,6 +59,8 @@ function formatValue(value: number, dataType: string): string {
 }
 
 export function Dashboard(): ReactElement {
+  const timezone = useTimezone();
+
   const { data: latestData, isLoading: isLoadingLatest } = useQuery({
     queryKey: ['health-data', 'latest', DATA_TYPES],
     queryFn: () => api.healthData.getLatest(DATA_TYPES),
@@ -187,6 +191,7 @@ export function Dashboard(): ReactElement {
                     lines={[{ dataKey: dataType, color: config.color, name: config.label }]}
                     height={180}
                     showGrid={false}
+                    timezone={timezone}
                   />
                 </div>
               );
@@ -211,8 +216,8 @@ export function Dashboard(): ReactElement {
         {latestReport ? (
           <div>
             <p className="text-sm text-gray-500">
-              {new Date(latestReport.period_start).toLocaleDateString('ja-JP')} -{' '}
-              {new Date(latestReport.period_end).toLocaleDateString('ja-JP')}
+              {formatDate(latestReport.period_start, timezone)} -{' '}
+              {formatDate(latestReport.period_end, timezone)}
             </p>
             <Markdown className="mt-2 text-gray-700">{latestReport.content.summary}</Markdown>
             {Object.keys(latestReport.content.metrics).length > 0 && (

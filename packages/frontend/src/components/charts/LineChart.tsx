@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { formatShortDate, formatDate } from '../../lib/date-utils';
 
 export interface ChartDataPoint {
   date: string;
@@ -26,6 +27,7 @@ interface LineChartProps {
   showGrid?: boolean;
   showTooltip?: boolean;
   showLegend?: boolean;
+  timezone?: string;
 }
 
 export function LineChart({
@@ -36,6 +38,7 @@ export function LineChart({
   showGrid = true,
   showTooltip = true,
   showLegend = false,
+  timezone = 'Asia/Tokyo',
 }: LineChartProps) {
   if (data.length === 0) {
     return (
@@ -48,9 +51,8 @@ export function LineChart({
     );
   }
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return `${date.getMonth() + 1}/${date.getDate()}`;
+  const formatDateTick = (dateStr: string) => {
+    return formatShortDate(dateStr, timezone);
   };
 
   return (
@@ -62,7 +64,7 @@ export function LineChart({
         {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />}
         <XAxis
           dataKey={xAxisKey}
-          tickFormatter={formatDate}
+          tickFormatter={formatDateTick}
           stroke="#6b7280"
           fontSize={12}
         />
@@ -74,10 +76,7 @@ export function LineChart({
               border: '1px solid #e5e7eb',
               borderRadius: '6px',
             }}
-            labelFormatter={(label) => {
-              const date = new Date(label);
-              return date.toLocaleDateString('ja-JP');
-            }}
+            labelFormatter={(label) => formatDate(String(label), timezone)}
           />
         )}
         {showLegend && <Legend />}

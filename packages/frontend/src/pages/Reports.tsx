@@ -3,26 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Markdown } from '../components/Markdown';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
+import { useTimezone } from '../contexts/SettingsContext';
+import { formatDateTime, formatPeriod as formatPeriodUtil } from '../lib/date-utils';
 import type { Report } from '../types';
 
 type ReportFilter = 'all' | 'daily' | 'on_fetch';
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatPeriod(start: string, end: string): string {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  return `${startDate.toLocaleDateString('ja-JP')} - ${endDate.toLocaleDateString('ja-JP')}`;
-}
 
 function ReportTypeBadge({ type }: { type: 'on_fetch' | 'daily' }): ReactElement {
   const config = {
@@ -46,6 +31,7 @@ interface ReportCardProps {
 
 function ReportCard({ report, onDelete, isDeleting }: ReportCardProps): ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
+  const timezone = useTimezone();
   const { content } = report;
 
   const metricEntries = Object.entries(content.metrics);
@@ -58,7 +44,7 @@ function ReportCard({ report, onDelete, isDeleting }: ReportCardProps): ReactEle
             <div className="flex items-center gap-2">
               <ReportTypeBadge type={report.report_type} />
               <span className="text-sm text-gray-500">
-                {formatPeriod(report.period_start, report.period_end)}
+                {formatPeriodUtil(report.period_start, report.period_end, timezone)}
               </span>
             </div>
             <Markdown className="mt-2 text-gray-700">{content.summary}</Markdown>
@@ -130,7 +116,7 @@ function ReportCard({ report, onDelete, isDeleting }: ReportCardProps): ReactEle
         )}
 
         <p className="mt-4 text-xs text-gray-400">
-          作成日時: {formatDate(report.created_at)}
+          作成日時: {formatDateTime(report.created_at, timezone)}
         </p>
       </div>
     </div>
