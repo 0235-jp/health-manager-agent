@@ -347,7 +347,7 @@ function ReportExcludedPeriodsSection(): ReactElement {
 
   function handleAdd(): void {
     const newPeriod: ExcludedPeriod = {
-      id: crypto.randomUUID(),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       startTime: '23:00',
       endTime: '07:00',
       enabled: true,
@@ -401,10 +401,7 @@ function ReportExcludedPeriodsSection(): ReactElement {
         </div>
       )}
 
-      <button
-        onClick={handleAdd}
-        className="text-sm text-blue-600 hover:text-blue-800"
-      >
+      <button type="button" onClick={handleAdd} className={ADD_BUTTON_CLASS}>
         + 時間帯を追加
       </button>
 
@@ -515,6 +512,9 @@ function TagInput({ value, onChange, placeholder }: TagInputProps): ReactElement
 
 const PROFILE_INPUT_CLASS =
   'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+const ADD_BUTTON_CLASS =
+  'px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md';
 
 function UserProfileSection(): ReactElement {
   const queryClient = useQueryClient();
@@ -719,10 +719,7 @@ function CustomInstructionsSection(): ReactElement {
   return (
     <div className="space-y-4">
       {!isAdding && (
-        <button
-          onClick={() => setIsAdding(true)}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
+        <button type="button" onClick={() => setIsAdding(true)} className={ADD_BUTTON_CLASS}>
           + 指示を追加
         </button>
       )}
