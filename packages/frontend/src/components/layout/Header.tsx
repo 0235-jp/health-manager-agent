@@ -2,6 +2,7 @@ import type { ReactElement, ChangeEvent } from 'react';
 import { useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useHeader, type HeaderAction } from '../../contexts/HeaderContext';
+import { useSidebar } from '../../contexts/SidebarContext';
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'ダッシュボード',
@@ -67,14 +68,33 @@ function ActionButton({ action }: { action: HeaderAction }): ReactElement {
   );
 }
 
+function HamburgerButton(): ReactElement {
+  const { toggle } = useSidebar();
+
+  return (
+    <button
+      onClick={toggle}
+      className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 md:hidden"
+      aria-label="メニューを開く"
+    >
+      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  );
+}
+
 export function Header(): ReactElement {
   const location = useLocation();
   const { actions } = useHeader();
   const pageTitle = PAGE_TITLES[location.pathname] ?? '';
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6">
-      <h1 className="text-xl font-semibold text-gray-800">{pageTitle}</h1>
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 md:px-6">
+      <div className="flex items-center">
+        <HamburgerButton />
+        <h1 className="text-lg md:text-xl font-semibold text-gray-800">{pageTitle}</h1>
+      </div>
       {actions.length > 0 && (
         <div className="flex items-center gap-2">
           {actions.map((action, index) => (

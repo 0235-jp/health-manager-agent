@@ -144,7 +144,7 @@ export function Dashboard(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         {DATA_TYPES.map((dataType) => {
           const config = DATA_TYPE_LABELS[dataType];
           return (
@@ -163,7 +163,7 @@ export function Dashboard(): ReactElement {
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-4 text-lg font-medium text-gray-800">7日間の推移</h3>
         {chartData.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {DATA_TYPES.map((dataType) => {
               const config = DATA_TYPE_LABELS[dataType];
               const hasData = chartData.some((d) => (d[dataType] as number) > 0);

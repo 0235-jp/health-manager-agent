@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useChat } from '../contexts/ChatContext';
 import { useHeaderActions } from '../hooks/useHeaderActions';
 import { api } from '../lib/api';
@@ -109,21 +109,17 @@ export default function Chat(): React.ReactElement {
     }
   }
 
-  const handleClear = useCallback(() => {
-    clearMessages();
-  }, [clearMessages]);
-
   useHeaderActions([{
     label: 'クリア',
-    onClick: handleClear,
+    onClick: clearMessages,
     variant: 'secondary',
     disabled: isStreaming || messages.length === 0,
-  }], [handleClear, isStreaming, messages.length]);
+  }], [clearMessages, isStreaming, messages.length]);
 
   return (
     <div className="flex flex-col h-full">
       {/* メッセージエリア */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 space-y-4">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
@@ -145,8 +141,8 @@ export default function Chat(): React.ReactElement {
       </div>
 
       {/* 入力エリア */}
-      <div className="border-t border-gray-200 px-6 py-4">
-        <form onSubmit={handleSubmit} className="flex gap-3">
+      <div className="border-t border-gray-200 px-4 md:px-6 py-3 md:py-4">
+        <form onSubmit={handleSubmit} className="flex gap-2 md:gap-3">
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -161,7 +157,7 @@ export default function Chat(): React.ReactElement {
           <button
             type="submit"
             disabled={!inputValue.trim() || isStreaming}
-            className="px-6 py-3 bg-blue-500 text-white font-medium rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 md:px-6 py-3 bg-blue-500 text-white font-medium rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             {isStreaming ? '...' : '送信'}
           </button>

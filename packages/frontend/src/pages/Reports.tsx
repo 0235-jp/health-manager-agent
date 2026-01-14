@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Markdown } from '../components/Markdown';
@@ -180,15 +180,15 @@ export function Reports(): ReactElement {
     { value: 'manual', label: '手動' },
   ];
 
-  const handleToggleForm = useCallback(() => {
+  function handleToggleForm(): void {
     setIsGenerateFormOpen((prev) => !prev);
-  }, []);
+  }
 
   useHeaderActions([{
     label: 'レポートを生成',
     onClick: handleToggleForm,
     variant: 'primary',
-  }], [handleToggleForm]);
+  }], []);
 
   return (
     <div className="space-y-6">
@@ -260,7 +260,7 @@ export function Reports(): ReactElement {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {filters.map(({ value, label }) => (
           <button
             key={value}

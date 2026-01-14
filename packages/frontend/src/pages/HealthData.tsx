@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDateTime } from '../lib/date-utils';
@@ -44,62 +44,111 @@ function DataTableContent({
   }
 
   return (
-    <table className="w-full">
-      <thead className="border-b border-gray-200 bg-gray-50">
-        <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-            タイプ
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-            値
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-            ソース
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
-            記録日時
-          </th>
-          <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
-            操作
-          </th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-gray-200">
+    <>
+      {/* Desktop: Table */}
+      <table className="hidden md:table w-full">
+        <thead className="border-b border-gray-200 bg-gray-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              タイプ
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              値
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              ソース
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+              記録日時
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">
+              操作
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {data.data.map((item) => (
+            <tr key={item.id} className="hover:bg-gray-50">
+              <td className="px-6 py-4 text-sm text-gray-900">{item.data_type}</td>
+              <td className="px-6 py-4 text-sm text-gray-900">
+                {item.value} {item.unit}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500">{item.source}</td>
+              <td className="px-6 py-4 text-sm text-gray-500">
+                {formatDateTime(item.recorded_at, timezone)}
+              </td>
+              <td className="px-6 py-4 text-right">
+                {item.source === 'manual' && (
+                  <>
+                    <button
+                      onClick={() => onEdit(item)}
+                      className="mr-3 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      編集
+                    </button>
+                    <button
+                      onClick={() => onDelete(item)}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      削除
+                    </button>
+                  </>
+                )}
+                {item.source !== 'manual' && (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Mobile: Card List */}
+      <div className="md:hidden divide-y divide-gray-200">
         {data.data.map((item) => (
-          <tr key={item.id} className="hover:bg-gray-50">
-            <td className="px-6 py-4 text-sm text-gray-900">{item.data_type}</td>
-            <td className="px-6 py-4 text-sm text-gray-900">
-              {item.value} {item.unit}
-            </td>
-            <td className="px-6 py-4 text-sm text-gray-500">{item.source}</td>
-            <td className="px-6 py-4 text-sm text-gray-500">
-              {formatDateTime(item.recorded_at, timezone)}
-            </td>
-            <td className="px-6 py-4 text-right">
+          <div key={item.id} className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-900">{item.data_type}</span>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                    {item.source}
+                  </span>
+                </div>
+                <p className="mt-1 text-lg font-semibold text-gray-900">
+                  {item.value} {item.unit && <span className="text-sm font-normal text-gray-500">{item.unit}</span>}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {formatDateTime(item.recorded_at, timezone)}
+                </p>
+              </div>
               {item.source === 'manual' && (
-                <>
+                <div className="flex gap-2 ml-2">
                   <button
                     onClick={() => onEdit(item)}
-                    className="mr-3 text-sm text-blue-600 hover:text-blue-800"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50"
+                    aria-label="編集"
                   >
-                    編集
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
                   </button>
                   <button
                     onClick={() => onDelete(item)}
-                    className="text-sm text-red-600 hover:text-red-800"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-red-600 hover:bg-red-50"
+                    aria-label="削除"
                   >
-                    削除
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                   </button>
-                </>
+                </div>
               )}
-              {item.source !== 'manual' && (
-                <span className="text-sm text-gray-400">-</span>
-              )}
-            </td>
-          </tr>
+            </div>
+          </div>
         ))}
-      </tbody>
-    </table>
+      </div>
+    </>
   );
 }
 
@@ -120,7 +169,7 @@ function Pagination({ page, total, onPrevious, onNext }: PaginationProps): React
   const hasNextPage = (page + 1) * PAGE_SIZE < total;
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-4">
+    <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 md:px-6 py-3">
       <span className="text-sm text-gray-500">
         全 {total} 件中 {startItem} - {endItem} 件表示
       </span>
@@ -128,14 +177,14 @@ function Pagination({ page, total, onPrevious, onNext }: PaginationProps): React
         <button
           onClick={onPrevious}
           disabled={page === 0}
-          className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-gray-100"
         >
           前へ
         </button>
         <button
           onClick={onNext}
           disabled={!hasNextPage}
-          className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-gray-100"
         >
           次へ
         </button>
@@ -263,35 +312,35 @@ export function HealthData(): ReactElement {
     },
   });
 
-  function handleEdit(item: HealthDataType) {
+  function handleEdit(item: HealthDataType): void {
     setEditData(item);
     setIsFormOpen(true);
   }
 
-  function handleDelete(item: HealthDataType) {
+  function handleDelete(item: HealthDataType): void {
     setDeleteTarget(item);
   }
 
-  function handleFormSuccess() {
+  function handleFormSuccess(): void {
     queryClient.invalidateQueries({ queryKey: ['health-data'] });
   }
 
-  function confirmDelete() {
+  function confirmDelete(): void {
     if (deleteTarget) {
       deleteMutation.mutate(deleteTarget.id);
     }
   }
 
-  const handleAdd = useCallback(() => {
+  function handleAdd(): void {
     setEditData(null);
     setIsFormOpen(true);
-  }, []);
+  }
 
   useHeaderActions([{
     label: '+ データを追加',
     onClick: handleAdd,
     variant: 'primary',
-  }], [handleAdd]);
+  }], []);
 
   return (
     <div className="space-y-6">
