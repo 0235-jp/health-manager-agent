@@ -6,6 +6,7 @@ import { formatDateForInput, getDateDaysAgo, formatDateTime } from '../lib/date-
 import { useTimezone } from '../contexts/SettingsContext';
 import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { Plugin, PluginType, ConfigField, DataTypeDefinition } from '../types';
+import { DataTypeSelectorModal } from '../components/DataTypeSelectorModal';
 
 type TabType = 'all' | PluginType | 'settings';
 
@@ -29,6 +30,16 @@ function getPluginTypeLabel(type: PluginType): string {
 
 function getPluginTypeBadgeClass(type: PluginType): string {
   return PLUGIN_TYPE_CONFIG[type]?.badgeClass ?? 'bg-gray-100 text-gray-800';
+}
+
+/**
+ * 有効データタイプ数の表示テキストを取得
+ */
+function getEnabledDataTypesLabel(plugin: Plugin): string {
+  const enabled = plugin.config?.enabledDataTypes as string[] | undefined;
+  const total = plugin.supportedDataTypes?.length ?? 0;
+  const count = enabled?.length ? enabled.length : total;
+  return `${count}/${total}`;
 }
 
 const INPUT_CLASS = 'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -179,6 +190,7 @@ interface PluginCardProps {
   onTest: () => void;
   onUninstall: () => void;
   onFetch?: () => void;
+  onConfigureDataTypes?: () => void;
   isToggling: boolean;
   isTesting: boolean;
   isCurrentAgent?: boolean;
@@ -192,6 +204,7 @@ function PluginCard({
   onTest,
   onUninstall,
   onFetch,
+  onConfigureDataTypes,
   isToggling,
   isTesting,
   isCurrentAgent,
@@ -292,6 +305,17 @@ function PluginCard({
             className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
           >
             {isTesting ? 'テスト中...' : 'テスト'}
+          </button>
+        )}
+        {plugin.type === 'data-source' && plugin.supportedDataTypes && plugin.supportedDataTypes.length > 0 && onConfigureDataTypes && (
+          <button
+            onClick={onConfigureDataTypes}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            データタイプ選択
+            <span className="ml-1 text-xs text-gray-500">
+              ({getEnabledDataTypesLabel(plugin)})
+            </span>
           </button>
         )}
         {plugin.type === 'data-source' && plugin.isLoaded && plugin.isActive && onFetch && (
@@ -642,6 +666,7 @@ export function Plugins(): ReactElement {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [configuringPlugin, setConfiguringPlugin] = useState<Plugin | null>(null);
   const [fetchingPlugin, setFetchingPlugin] = useState<Plugin | null>(null);
+  const [dataTypeSelectorPlugin, setDataTypeSelectorPlugin] = useState<Plugin | null>(null);
   const [testResult, setTestResult] = useState<{ name: string; success: boolean; message?: string } | null>(null);
 
   const { data: plugins = [], isLoading } = useQuery({
@@ -802,6 +827,7 @@ export function Plugins(): ReactElement {
               onTest={() => testMutation.mutate(plugin.name)}
               onUninstall={() => uninstallMutation.mutate(plugin.name)}
               onFetch={plugin.type === 'data-source' ? () => setFetchingPlugin(plugin) : undefined}
+              onConfigureDataTypes={plugin.type === 'data-source' ? () => setDataTypeSelectorPlugin(plugin) : undefined}
               isToggling={toggleMutation.isPending && toggleMutation.variables?.name === plugin.name}
               isTesting={testMutation.isPending && testMutation.variables === plugin.name}
               isCurrentAgent={plugin.type === 'agent' && currentAgent?.name === plugin.name}
@@ -824,6 +850,21 @@ export function Plugins(): ReactElement {
         <FetchModal
           plugin={fetchingPlugin}
           onClose={() => setFetchingPlugin(null)}
+        />
+      )}
+
+      {dataTypeSelectorPlugin && (
+        <DataTypeSelectorModal
+          plugin={dataTypeSelectorPlugin}
+          onClose={() => setDataTypeSelectorPlugin(null)}
+          onSave={(enabledDataTypes) => {
+            configMutation.mutate({
+              name: dataTypeSelectorPlugin.name,
+              config: { enabledDataTypes },
+            });
+            setDataTypeSelectorPlugin(null);
+          }}
+          isSaving={configMutation.isPending}
         />
       )}
     </div>

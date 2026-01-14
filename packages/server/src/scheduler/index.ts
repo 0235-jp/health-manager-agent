@@ -13,6 +13,7 @@ import { reportsRepository } from '../db/repositories/reports.js';
 import { healthDataRepository } from '../db/repositories/health-data.js';
 import { settingsRepository } from '../db/repositories/settings.js';
 import { pluginCollectionStateRepository } from '../db/repositories/plugin-collection-state.js';
+import { pluginsRepository } from '../db/repositories/plugins.js';
 import type { NotificationEvent } from '../plugins/interfaces/notification.js';
 import type { PerPluginFetchOptions, PluginFetchResult } from '../plugins/interfaces/index.js';
 
@@ -30,6 +31,15 @@ interface HealthDataItem {
   unit: string;
   source: string;
   recorded_at: string;
+}
+
+/**
+ * プラグインの有効データタイプを取得
+ */
+function getEnabledDataTypes(pluginName: string): string[] | undefined {
+  const config = pluginsRepository.getConfig(pluginName);
+  const enabledDataTypes = config?.enabledDataTypes as string[] | undefined;
+  return enabledDataTypes?.length ? enabledDataTypes : undefined;
 }
 
 /**
@@ -203,7 +213,7 @@ export class Scheduler {
       return { pluginResults: [], totalFetched: 0, inserted: 0, skipped: 0 };
     }
 
-    // 2. プラグインごとの開始時刻を計算
+    // 2. プラグインごとの開始時刻・データタイプを計算
     const perPluginOptions: PerPluginFetchOptions = {};
     for (const pluginState of activeDataSources) {
       const pluginName = pluginState.manifest.name;
@@ -214,7 +224,13 @@ export class Scheduler {
         ? new Date(state.last_success_time)
         : new Date(periodEnd.getTime() - 24 * 60 * 60 * 1000);
 
-      perPluginOptions[pluginName] = { startDate, endDate: periodEnd };
+      const dataTypes = getEnabledDataTypes(pluginName);
+
+      perPluginOptions[pluginName] = {
+        startDate,
+        endDate: periodEnd,
+        ...(dataTypes && { dataTypes }),
+      };
     }
 
     // 3. プラグインごとにデータ取得
@@ -367,10 +383,23 @@ export class Scheduler {
     // フィルタされたプラグイン名を取得
     const targetPluginNames = activeDataSources.map((state) => state.manifest.name);
 
+    // プラグインごとのオプションを計算（enabledDataTypes を適用）
+    const perPluginOptions: PerPluginFetchOptions = {};
+    for (const pluginState of activeDataSources) {
+      const pluginName = pluginState.manifest.name;
+      const dataTypes = getEnabledDataTypes(pluginName);
+
+      perPluginOptions[pluginName] = {
+        startDate,
+        endDate,
+        ...(dataTypes && { dataTypes }),
+      };
+    }
+
     // プラグインごとにデータ取得（フィルタ適用）
     const results = await pluginManager.executeDataSourcePluginsWithState(
       { startDate, endDate },
-      undefined,
+      perPluginOptions,
       targetPluginNames
     );
 
