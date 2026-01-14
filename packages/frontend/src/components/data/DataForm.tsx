@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { HealthData } from '../../types';
 import { api } from '../../lib/api';
 import { formatForDateTimeLocal, dateTimeLocalToISO } from '../../lib/date-utils';
@@ -92,7 +93,7 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="px-6 py-4 border-b">
@@ -188,6 +189,7 @@ export function DataForm({ isOpen, onClose, editData, onSuccess }: DataFormProps
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

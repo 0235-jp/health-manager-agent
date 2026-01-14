@@ -1,9 +1,10 @@
-import { useState, type ReactElement } from 'react';
+import { useState, useCallback, type ReactElement } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Markdown } from '../components/Markdown';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
 import { useTimezone } from '../contexts/SettingsContext';
+import { useHeaderActions } from '../hooks/useHeaderActions';
 import { formatDateTime, formatPeriod, getTodayDatetimeRange } from '../lib/date-utils';
 import type { Report, ReportType } from '../types';
 
@@ -179,21 +180,18 @@ export function Reports(): ReactElement {
     { value: 'manual', label: '手動' },
   ];
 
+  const handleToggleForm = useCallback(() => {
+    setIsGenerateFormOpen((prev) => !prev);
+  }, []);
+
+  useHeaderActions([{
+    label: 'レポートを生成',
+    onClick: handleToggleForm,
+    variant: 'primary',
+  }], [handleToggleForm]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">レポート</h2>
-        <button
-          onClick={() => setIsGenerateFormOpen(!isGenerateFormOpen)}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          レポートを生成
-        </button>
-      </div>
-
       {/* 生成フォーム */}
       {isGenerateFormOpen && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">

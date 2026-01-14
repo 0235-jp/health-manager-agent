@@ -1,9 +1,10 @@
-import type { ReactElement, ChangeEvent, FormEvent } from 'react';
-import { useState, useRef, useMemo } from 'react';
+import type { ReactElement, FormEvent } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
 import { formatDateForInput, getDateDaysAgo, formatDateTime } from '../lib/date-utils';
 import { useTimezone } from '../contexts/SettingsContext';
+import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { Plugin, PluginType, ConfigField, DataTypeDefinition } from '../types';
 
 type TabType = 'all' | PluginType | 'settings';
@@ -638,7 +639,6 @@ function DataSourcePrioritySection({ plugins }: DataSourcePrioritySectionProps):
 
 export function Plugins(): ReactElement {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [configuringPlugin, setConfiguringPlugin] = useState<Plugin | null>(null);
   const [fetchingPlugin, setFetchingPlugin] = useState<Plugin | null>(null);
@@ -694,9 +694,6 @@ export function Plugins(): ReactElement {
     mutationFn: (file: File) => api.plugins.install(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     },
   });
 
@@ -708,16 +705,22 @@ export function Plugins(): ReactElement {
     },
   });
 
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>): void {
-    const file = e.target.files?.[0];
-    if (file) {
-      installMutation.mutate(file);
-    }
-  }
-
   const filteredPlugins = activeTab === 'all' || activeTab === 'settings'
     ? plugins
     : plugins.filter((p) => p.type === activeTab);
+
+  const handleFileUpload = useCallback((file: File) => {
+    installMutation.mutate(file);
+  }, [installMutation]);
+
+  useHeaderActions([{
+    label: installMutation.isPending ? 'インストール中...' : 'プラグインをインストール',
+    type: 'file-upload',
+    accept: '.zip',
+    onFileChange: handleFileUpload,
+    variant: 'primary',
+    disabled: installMutation.isPending,
+  }], [handleFileUpload, installMutation.isPending]);
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
@@ -725,26 +728,6 @@ export function Plugins(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">プラグイン管理</h2>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            onChange={handleFileChange}
-            className="hidden"
-            id="plugin-upload"
-          />
-          <label
-            htmlFor="plugin-upload"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 cursor-pointer disabled:opacity-50"
-          >
-            {installMutation.isPending ? 'インストール中...' : 'プラグインをインストール'}
-          </label>
-        </div>
-      </div>
-
       {installMutation.isError && (
         <div className="p-4 rounded-md bg-red-50 border border-red-200">
           <p className="text-sm text-red-700">

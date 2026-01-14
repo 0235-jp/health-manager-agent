@@ -1,9 +1,10 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDateTime } from '../lib/date-utils';
 import { useTimezone } from '../contexts/SettingsContext';
+import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
 import { DataForm } from '../components/data/DataForm';
 
@@ -262,11 +263,6 @@ export function HealthData(): ReactElement {
     },
   });
 
-  function handleAdd() {
-    setEditData(null);
-    setIsFormOpen(true);
-  }
-
   function handleEdit(item: HealthDataType) {
     setEditData(item);
     setIsFormOpen(true);
@@ -286,18 +282,19 @@ export function HealthData(): ReactElement {
     }
   }
 
+  const handleAdd = useCallback(() => {
+    setEditData(null);
+    setIsFormOpen(true);
+  }, []);
+
+  useHeaderActions([{
+    label: '+ データを追加',
+    onClick: handleAdd,
+    variant: 'primary',
+  }], [handleAdd]);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">データ管理</h2>
-        <button
-          onClick={handleAdd}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-        >
-          + データを追加
-        </button>
-      </div>
-
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap gap-4">
           <select

@@ -816,8 +816,6 @@ export function Settings(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">設定</h2>
-
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h3 className="mb-2 text-lg font-medium text-gray-800">
           ユーザープロファイル

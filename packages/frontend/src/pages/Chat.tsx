@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useChat } from '../contexts/ChatContext';
+import { useHeaderActions } from '../hooks/useHeaderActions';
 import { api } from '../lib/api';
 import type { ChatMessage } from '../types';
 import { Markdown } from '../components/Markdown';
@@ -108,20 +109,19 @@ export default function Chat(): React.ReactElement {
     }
   }
 
+  const handleClear = useCallback(() => {
+    clearMessages();
+  }, [clearMessages]);
+
+  useHeaderActions([{
+    label: 'クリア',
+    onClick: handleClear,
+    variant: 'secondary',
+    disabled: isStreaming || messages.length === 0,
+  }], [handleClear, isStreaming, messages.length]);
+
   return (
     <div className="flex flex-col h-full">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-        <h1 className="text-xl font-semibold text-gray-900">AI アシスタント</h1>
-        <button
-          onClick={clearMessages}
-          disabled={isStreaming || messages.length === 0}
-          className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          クリア
-        </button>
-      </div>
-
       {/* メッセージエリア */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 ? (
