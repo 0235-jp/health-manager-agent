@@ -411,7 +411,7 @@ export class OuraApiClient {
     endDate?: Date
   ): Promise<VO2MaxData[]> {
     return this.fetch<VO2MaxData>(
-      'vo2_max',
+      'vO2_max',
       this.getDateParams(startDate, endDate)
     );
   }
