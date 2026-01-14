@@ -279,7 +279,7 @@ export class Scheduler {
 
     // 7. 取得時レポート生成（Agentプラグインがある場合のみ）
     const currentAgent = pluginManager.getCurrentAgent();
-    if (currentAgent && inserted > 0) {
+    if (currentAgent) {
       // 除外時間帯チェック
       const excludedPeriods = (settingsRepository.get('report_excluded_periods') as ExcludedPeriod[]) || [];
       const timezone = (settingsRepository.get('timezone') as string) || Scheduler.DEFAULT_TIMEZONE;
