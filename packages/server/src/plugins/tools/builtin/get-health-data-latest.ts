@@ -40,9 +40,9 @@ export function executeGetHealthDataLatest(
 
     let dataTypes = args.data_types ?? [];
 
-    // If no data types specified, get all available data types
+    // If no data types specified, get all available data types (including plugin types)
     if (dataTypes.length === 0) {
-      const allTypes = dataTypesRepository.findAll();
+      const allTypes = dataTypesRepository.findAllWithPluginTypes();
       dataTypes = allTypes.map((dt) => dt.name);
     }
 

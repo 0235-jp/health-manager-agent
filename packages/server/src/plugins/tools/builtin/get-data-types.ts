@@ -2,7 +2,7 @@
  * get-data-types tool - Get available health data types
  */
 
-import { dataTypesRepository } from '../../../db/repositories/data-types.js';
+import { dataTypesRepository, formatDataTypeRecord } from '../../../db/repositories/data-types.js';
 import type { ToolDefinition, ToolResult } from '../interfaces.js';
 
 export const getDataTypesTool: ToolDefinition = {
@@ -32,25 +32,9 @@ export interface GetDataTypesArgs {
 
 export function executeGetDataTypes(args: GetDataTypesArgs): ToolResult {
   try {
-    const query: { category?: string; is_standard?: boolean } = {};
-
-    if (args.category) {
-      query.category = args.category;
-    }
-    if (args.is_standard !== undefined) {
-      query.is_standard = args.is_standard;
-    }
-
-    const dataTypes = dataTypesRepository.findAll(query);
-
-    const formattedData = dataTypes.map((dt) => ({
-      name: dt.name,
-      display_name: dt.display_name,
-      category: dt.category,
-      unit: dt.unit,
-      is_standard: dt.is_standard === 1,
-      plugin_name: dt.plugin_name,
-    }));
+    // プラグインのデータタイプも含めて取得
+    const dataTypes = dataTypesRepository.findAllWithPluginTypes(args);
+    const formattedData = dataTypes.map(formatDataTypeRecord);
 
     return {
       success: true,

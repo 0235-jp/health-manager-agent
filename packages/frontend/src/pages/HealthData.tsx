@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { formatDateTime } from '../lib/date-utils';
+import { formatUnit } from '../lib/unit-utils';
 import { useTimezone } from '../contexts/SettingsContext';
 import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
@@ -16,6 +17,7 @@ interface DataTableContentProps {
   data: PaginatedResponse<HealthDataType> | undefined;
   onEdit: (item: HealthDataType) => void;
   onDelete: (item: HealthDataType) => void;
+  formatDataType: (name: string) => string;
 }
 
 function DataTableContent({
@@ -24,6 +26,7 @@ function DataTableContent({
   data,
   onEdit,
   onDelete,
+  formatDataType,
 }: DataTableContentProps): ReactElement {
   const timezone = useTimezone();
 
@@ -69,16 +72,16 @@ function DataTableContent({
         <tbody className="divide-y divide-gray-200">
           {data.data.map((item) => (
             <tr key={item.id} className="hover:bg-gray-50">
-              <td className="px-6 py-4 text-sm text-gray-900">{item.data_type}</td>
+              <td className="px-6 py-4 text-sm text-gray-900">{formatDataType(item.data_type)}</td>
               <td className="px-6 py-4 text-sm text-gray-900">
-                {item.value} {item.unit}
+                {item.value} {formatUnit(item.unit, item.data_type)}
               </td>
               <td className="px-6 py-4 text-sm text-gray-500">{item.source}</td>
               <td className="px-6 py-4 text-sm text-gray-500">
                 {formatDateTime(item.recorded_at, timezone)}
               </td>
               <td className="px-6 py-4 text-right">
-                {item.source === 'manual' && (
+                {item.source === 'manual' ? (
                   <>
                     <button
                       onClick={() => onEdit(item)}
@@ -93,8 +96,7 @@ function DataTableContent({
                       削除
                     </button>
                   </>
-                )}
-                {item.source !== 'manual' && (
+                ) : (
                   <span className="text-sm text-gray-400">-</span>
                 )}
               </td>
@@ -110,13 +112,13 @@ function DataTableContent({
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">{item.data_type}</span>
+                  <span className="text-sm font-medium text-gray-900">{formatDataType(item.data_type)}</span>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                     {item.source}
                   </span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {item.value} {item.unit && <span className="text-sm font-normal text-gray-500">{item.unit}</span>}
+                  {item.value} {item.unit && <span className="text-sm font-normal text-gray-500">{formatUnit(item.unit, item.data_type)}</span>}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
                   {formatDateTime(item.recorded_at, timezone)}
@@ -274,6 +276,17 @@ export function HealthData(): ReactElement {
     queryFn: () => api.dataTypes.list(),
   });
 
+  // データタイプ名からdisplayNameを取得するマップ
+  const dataTypeDisplayMap = new Map<string, string>(
+    (dataTypesResponse?.data || []).map((dt: DataType) => [dt.name, dt.display_name])
+  );
+
+  // データタイプを「displayName (name)」形式でフォーマット
+  function formatDataType(name: string): string {
+    const displayName = dataTypeDisplayMap.get(name);
+    return displayName ? `${displayName} (${name})` : name;
+  }
+
   // ソース選択肢を構築（manual + data-sourceプラグイン）
   const sourceOptions = [
     { value: 'manual', label: '手動入力' },
@@ -286,7 +299,7 @@ export function HealthData(): ReactElement {
   // データタイプ選択肢
   const dataTypeOptions = (dataTypesResponse?.data || []).map((dt: DataType) => ({
     value: dt.name,
-    label: dt.display_name,
+    label: `${dt.display_name} (${dt.name})`,
   }));
 
   // フィルター変更時にページをリセット
@@ -398,6 +411,7 @@ export function HealthData(): ReactElement {
           data={data}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          formatDataType={formatDataType}
         />
         {data && (
           <Pagination
