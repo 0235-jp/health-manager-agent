@@ -224,6 +224,42 @@ export interface HydrateData {
   amount: number;
 }
 
+export interface HRVData {
+  timestamp: Date;
+  sdnn?: number;
+  rmssd?: number;
+}
+
+export interface NutritionData {
+  timestamp: Date;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
+export interface MenstrualData {
+  day: string;
+  flow?: number;
+  cycleLength?: number;
+  ovulation?: boolean;
+  cervicalMucus?: number;
+  dysmenorrhoea?: number;
+}
+
+export interface SleepRecordData extends SleepData {
+  sleepScore?: number;
+  respiratoryRate?: number;
+}
+
+export interface UrineRoutineData {
+  timestamp: Date;
+  uricAcid?: number;
+  bilirubin?: number;
+  glucose?: number;
+}
+
+
 /**
  * Huawei Health API クライアント
  */
@@ -526,28 +562,32 @@ export class HuaweiHealthApiClient {
       this.getSampleData(DATA_TYPES.ALTITUDE, startDate, endDate).catch(() => []),
     ]);
 
-    // 日付ごとに集計
     const activityByDay = new Map<string, ActivityData>();
+
+    const getEntry = (day: string): ActivityData => {
+      let entry = activityByDay.get(day);
+      if (!entry) {
+        entry = { day, calories: 0 };
+        activityByDay.set(day, entry);
+      }
+      return entry;
+    };
 
     for (const point of caloriesPoints) {
       const day = new Date(point.endTime).toISOString().split('T')[0];
-      const existing = activityByDay.get(day) || { day, calories: 0 };
-      existing.calories += Number(point.fieldValues['calories'] || point.fieldValues['value'] || 0);
-      activityByDay.set(day, existing);
+      getEntry(day).calories += Number(point.fieldValues['calories'] || point.fieldValues['value'] || 0);
     }
 
     for (const point of distancePoints) {
       const day = new Date(point.endTime).toISOString().split('T')[0];
-      const existing = activityByDay.get(day) || { day, calories: 0 };
-      existing.distance = (existing.distance || 0) + Number(point.fieldValues['distance'] || point.fieldValues['value'] || 0);
-      activityByDay.set(day, existing);
+      const entry = getEntry(day);
+      entry.distance = (entry.distance || 0) + Number(point.fieldValues['distance'] || point.fieldValues['value'] || 0);
     }
 
     for (const point of altitudePoints) {
       const day = new Date(point.endTime).toISOString().split('T')[0];
-      const existing = activityByDay.get(day) || { day, calories: 0 };
-      existing.floorsClimbed = (existing.floorsClimbed || 0) + Number(point.fieldValues['floors'] || 0);
-      activityByDay.set(day, existing);
+      const entry = getEntry(day);
+      entry.floorsClimbed = (entry.floorsClimbed || 0) + Number(point.fieldValues['floors'] || 0);
     }
 
     return Array.from(activityByDay.values());
@@ -565,25 +605,25 @@ export class HuaweiHealthApiClient {
 
     const metricsMap = new Map<number, BodyMetricsData>();
 
+    const getEntry = (ts: number): BodyMetricsData => {
+      let entry = metricsMap.get(ts);
+      if (!entry) {
+        entry = { timestamp: new Date(ts) };
+        metricsMap.set(ts, entry);
+      }
+      return entry;
+    };
+
     for (const point of weightPoints) {
-      const timestamp = point.startTime;
-      const existing = metricsMap.get(timestamp) || { timestamp: new Date(timestamp) };
-      existing.weight = Number(point.fieldValues['weight'] || point.fieldValues['value'] || 0);
-      metricsMap.set(timestamp, existing);
+      getEntry(point.startTime).weight = Number(point.fieldValues['weight'] || point.fieldValues['value'] || 0);
     }
 
     for (const point of heightPoints) {
-      const timestamp = point.startTime;
-      const existing = metricsMap.get(timestamp) || { timestamp: new Date(timestamp) };
-      existing.height = Number(point.fieldValues['height'] || point.fieldValues['value'] || 0) * 100; // m to cm
-      metricsMap.set(timestamp, existing);
+      getEntry(point.startTime).height = Number(point.fieldValues['height'] || point.fieldValues['value'] || 0) * 100;
     }
 
     for (const point of fatPoints) {
-      const timestamp = point.startTime;
-      const existing = metricsMap.get(timestamp) || { timestamp: new Date(timestamp) };
-      existing.bodyFat = Number(point.fieldValues['body_fat_rate'] || point.fieldValues['value'] || 0);
-      metricsMap.set(timestamp, existing);
+      getEntry(point.startTime).bodyFat = Number(point.fieldValues['body_fat_rate'] || point.fieldValues['value'] || 0);
     }
 
     return Array.from(metricsMap.values());
@@ -678,6 +718,161 @@ export class HuaweiHealthApiClient {
       timestamp: new Date(point.startTime),
       amount: Number(point.fieldValues['volume'] || point.fieldValues['value'] || 0) * 1000, // L to ml
     }));
+  }
+
+  /**
+   * 安静時心拍数データを取得
+   */
+  async getRestingHeartRate(startDate: Date, endDate: Date): Promise<HeartRateData[]> {
+    const samplePoints = await this.getSampleData(DATA_TYPES.RESTING_HEART_RATE, startDate, endDate);
+
+    return samplePoints.map(point => ({
+      timestamp: new Date(point.startTime),
+      bpm: Number(point.fieldValues['bpm'] || point.fieldValues['value'] || 0),
+    }));
+  }
+
+  /**
+   * HRV（心拍変動）データを取得
+   */
+  async getHRV(startDate: Date, endDate: Date): Promise<HRVData[]> {
+    const samplePoints = await this.getSampleData(DATA_TYPES.HRV, startDate, endDate);
+
+    return samplePoints.map(point => ({
+      timestamp: new Date(point.startTime),
+      sdnn: point.fieldValues['sdnn'] !== undefined ? Number(point.fieldValues['sdnn']) : undefined,
+      rmssd: point.fieldValues['rmssd'] !== undefined ? Number(point.fieldValues['rmssd']) : undefined,
+    }));
+  }
+
+  /**
+   * 栄養データを取得
+   */
+  async getNutrition(startDate: Date, endDate: Date): Promise<NutritionData[]> {
+    const samplePoints = await this.getSampleData(DATA_TYPES.NUTRITION, startDate, endDate);
+
+    return samplePoints.map(point => ({
+      timestamp: new Date(point.startTime),
+      calories: point.fieldValues['calories'] !== undefined ? Number(point.fieldValues['calories']) : undefined,
+      protein: point.fieldValues['protein'] !== undefined ? Number(point.fieldValues['protein']) : undefined,
+      carbs: point.fieldValues['carbs'] !== undefined ? Number(point.fieldValues['carbs']) : undefined,
+      fat: point.fieldValues['fat'] !== undefined ? Number(point.fieldValues['fat']) : undefined,
+    }));
+  }
+
+  /**
+   * 月経関連データを取得
+   */
+  async getMenstrualData(startDate: Date, endDate: Date): Promise<MenstrualData[]> {
+    const [flowPoints, cyclePoints, ovulationPoints, mucusPoints] = await Promise.all([
+      this.getSampleData(DATA_TYPES.MENSTRUAL_FLOW, startDate, endDate).catch(() => []),
+      this.getSampleData(DATA_TYPES.MENSTRUAL_CYCLE, startDate, endDate).catch(() => []),
+      this.getSampleData(DATA_TYPES.OVULATION, startDate, endDate).catch(() => []),
+      this.getSampleData(DATA_TYPES.CERVICAL_MUCUS, startDate, endDate).catch(() => []),
+    ]);
+
+    const dataByDay = new Map<string, MenstrualData>();
+
+    const getEntry = (day: string): MenstrualData => {
+      let entry = dataByDay.get(day);
+      if (!entry) {
+        entry = { day };
+        dataByDay.set(day, entry);
+      }
+      return entry;
+    };
+
+    for (const point of flowPoints) {
+      const day = new Date(point.startTime).toISOString().split('T')[0];
+      getEntry(day).flow = Number(point.fieldValues['flow'] || point.fieldValues['value'] || 0);
+    }
+
+    for (const point of cyclePoints) {
+      const day = new Date(point.startTime).toISOString().split('T')[0];
+      getEntry(day).cycleLength = Number(point.fieldValues['cycle_length'] || point.fieldValues['value'] || 0);
+    }
+
+    for (const point of ovulationPoints) {
+      const day = new Date(point.startTime).toISOString().split('T')[0];
+      getEntry(day).ovulation = Boolean(point.fieldValues['ovulation'] || point.fieldValues['value']);
+    }
+
+    for (const point of mucusPoints) {
+      const day = new Date(point.startTime).toISOString().split('T')[0];
+      getEntry(day).cervicalMucus = Number(point.fieldValues['cervical_mucus'] || point.fieldValues['value'] || 0);
+    }
+
+    return Array.from(dataByDay.values());
+  }
+
+  /**
+   * 睡眠記録（スコア含む）を取得
+   */
+  async getSleepRecord(startDate: Date, endDate: Date): Promise<SleepRecordData[]> {
+    // 基本の睡眠データを取得
+    const sleepData = await this.getSleep(startDate, endDate);
+
+    // Sleep Record APIから追加情報を取得（利用可能な場合）
+    let scorePoints: SamplePoint[] = [];
+    try {
+      scorePoints = await this.getSampleData(DATA_TYPES.SLEEP_RECORD, startDate, endDate);
+    } catch {
+      // Sleep Record APIが利用できない場合は基本データのみ返す
+    }
+
+    const scoreByDay = new Map<string, { score?: number; respiratoryRate?: number }>();
+    for (const point of scorePoints) {
+      const day = new Date(point.startTime).toISOString().split('T')[0];
+      scoreByDay.set(day, {
+        score: point.fieldValues['sleep_score'] !== undefined ? Number(point.fieldValues['sleep_score']) : undefined,
+        respiratoryRate: point.fieldValues['respiratory_rate'] !== undefined ? Number(point.fieldValues['respiratory_rate']) : undefined,
+      });
+    }
+
+    return sleepData.map(sleep => {
+      const scores = scoreByDay.get(sleep.day);
+      return {
+        ...sleep,
+        sleepScore: scores?.score,
+        respiratoryRate: scores?.respiratoryRate,
+      };
+    });
+  }
+
+  /**
+   * 尿検査データを取得
+   */
+  async getUrineRoutine(startDate: Date, endDate: Date): Promise<UrineRoutineData[]> {
+    const [uricAcidPoints, bilirubinPoints, glucosePoints] = await Promise.all([
+      this.getSampleData(DATA_TYPES.URIC_ACID, startDate, endDate).catch(() => []),
+      this.getSampleData(DATA_TYPES.URINE_BILIRUBIN, startDate, endDate).catch(() => []),
+      this.getSampleData(DATA_TYPES.URINE_GLUCOSE, startDate, endDate).catch(() => []),
+    ]);
+
+    const dataByTimestamp = new Map<number, UrineRoutineData>();
+
+    const getEntry = (ts: number): UrineRoutineData => {
+      let entry = dataByTimestamp.get(ts);
+      if (!entry) {
+        entry = { timestamp: new Date(ts) };
+        dataByTimestamp.set(ts, entry);
+      }
+      return entry;
+    };
+
+    for (const point of uricAcidPoints) {
+      getEntry(point.startTime).uricAcid = Number(point.fieldValues['uric_acid'] || point.fieldValues['value'] || 0);
+    }
+
+    for (const point of bilirubinPoints) {
+      getEntry(point.startTime).bilirubin = Number(point.fieldValues['bilirubin'] || point.fieldValues['value'] || 0);
+    }
+
+    for (const point of glucosePoints) {
+      getEntry(point.startTime).glucose = Number(point.fieldValues['glucose'] || point.fieldValues['value'] || 0);
+    }
+
+    return Array.from(dataByTimestamp.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
   /**

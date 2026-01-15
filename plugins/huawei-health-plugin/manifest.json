@@ -1,9 +1,9 @@
 {
   "name": "huawei-health-plugin",
   "displayName": "Huawei Health",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "data-source",
-  "minHostVersion": "1.0.0",
+  "minHostVersion": "1.1.0",
   "description": "Huawei Health Kit REST APIからヘルスデータを取得",
   "author": "Health Manager Agent",
   "main": "dist/index.js",
@@ -23,9 +23,11 @@
     { "name": "huawei:climbing_height", "displayName": "登り高さ", "category": "活動", "unit": "meters" },
 
     { "name": "heart_rate", "displayName": "心拍数", "category": "心臓", "unit": "bpm" },
+    { "name": "heart_rate_timeseries", "displayName": "心拍数（時系列）", "category": "心臓", "unit": "bpm", "timeseries": true, "interval": 60, "description": "心拍数の詳細時系列データ（1分間隔）" },
     { "name": "resting_heart_rate", "displayName": "安静時心拍数", "category": "心臓", "unit": "bpm" },
     { "name": "huawei:hrv", "displayName": "心拍変動(HRV)", "category": "心臓", "unit": "ms", "description": "SDNN/rMSSD" },
     { "name": "spo2", "displayName": "血中酸素飽和度", "category": "心臓", "unit": "%" },
+    { "name": "huawei:spo2_timeseries", "displayName": "SpO2（時系列）", "category": "心臓", "unit": "%", "timeseries": true, "interval": 300, "description": "血中酸素飽和度の詳細時系列データ（5分間隔）" },
     { "name": "blood_pressure_systolic", "displayName": "収縮期血圧", "category": "心臓", "unit": "mmHg" },
     { "name": "blood_pressure_diastolic", "displayName": "拡張期血圧", "category": "心臓", "unit": "mmHg" },
     { "name": "huawei:bradycardia", "displayName": "徐脈記録", "category": "心臓", "unit": "event" },
@@ -56,6 +58,7 @@
     { "name": "body_temperature_rest", "displayName": "安静時体温", "category": "体温", "unit": "degC" },
 
     { "name": "huawei:stress_level", "displayName": "ストレスレベル", "category": "精神", "unit": "score" },
+    { "name": "huawei:stress_timeseries", "displayName": "ストレス（時系列）", "category": "精神", "unit": "score", "timeseries": true, "interval": 300, "description": "ストレスレベルの詳細時系列データ（5分間隔）" },
 
     { "name": "vo2_max", "displayName": "VO2 Max", "category": "フィットネス", "unit": "ml/kg/min" },
 
