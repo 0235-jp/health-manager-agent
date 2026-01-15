@@ -17,6 +17,7 @@ import { pluginCollectionStateRepository } from '../db/repositories/plugin-colle
 import { pluginsRepository } from '../db/repositories/plugins.js';
 import type { NotificationEvent } from '../plugins/interfaces/notification.js';
 import type { PerPluginFetchOptions, PluginFetchResult } from '../plugins/interfaces/index.js';
+import { logApiResponse } from '../utils/debug-logger.js';
 
 export interface BackfillResult {
   totalFetched: number;
@@ -253,6 +254,12 @@ export class Scheduler {
     const allTimeseriesData: TimeseriesCreate[] = [];
 
     for (const result of results) {
+      // デバッグログ出力
+      const pluginOptions = perPluginOptions[result.pluginName] || {};
+      logApiResponse(pluginOptions, result).catch((err) => {
+        console.error(`[Scheduler] Failed to log API response for ${result.pluginName}:`, err);
+      });
+
       if (result.success) {
         pluginCollectionStateRepository.markSuccess(result.pluginName, result.fetchedAt);
         const timeseriesCount = result.timeseriesData?.length || 0;
@@ -442,6 +449,12 @@ export class Scheduler {
     const allTimeseriesData: TimeseriesCreate[] = [];
 
     for (const result of results) {
+      // デバッグログ出力
+      const pluginOptions = perPluginOptions[result.pluginName] || {};
+      logApiResponse(pluginOptions, result).catch((err) => {
+        console.error(`[Scheduler] Failed to log API response for ${result.pluginName}:`, err);
+      });
+
       if (!result.success && result.errors) {
         errors.push({
           pluginName: result.pluginName,

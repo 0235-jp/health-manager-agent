@@ -663,6 +663,74 @@ function UserProfileSection(): ReactElement {
   );
 }
 
+interface DebugOption {
+  field: 'debug_api_responses' | 'debug_chat';
+  label: string;
+  description: string;
+}
+
+const DEBUG_OPTIONS: DebugOption[] = [
+  {
+    field: 'debug_api_responses',
+    label: 'API取得データを保存',
+    description: 'プラグインのデータ取得結果を data/debug/api-responses/ に保存します',
+  },
+  {
+    field: 'debug_chat',
+    label: 'チャットデータを保存',
+    description: 'チャットのリクエストとレスポンスを data/debug/chat/ に保存します',
+  },
+];
+
+function DebugSection(): ReactElement {
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: api.settings.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+
+  function handleToggle(field: DebugOption['field'], value: boolean): void {
+    updateMutation.mutate({ [field]: value });
+  }
+
+  return (
+    <div className="space-y-4">
+      {DEBUG_OPTIONS.map((option) => (
+        <div key={option.field} className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id={option.field}
+            checked={(settings?.[option.field] as boolean) ?? false}
+            onChange={(e) => handleToggle(option.field, e.target.checked)}
+            disabled={updateMutation.isPending}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <div>
+            <label htmlFor={option.field} className="text-sm font-medium text-gray-700">
+              {option.label}
+            </label>
+            <p className="text-xs text-gray-500">{option.description}</p>
+          </div>
+        </div>
+      ))}
+
+      {updateMutation.isError && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          エラー: {(updateMutation.error as Error).message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CustomInstructionsSection(): ReactElement {
   const queryClient = useQueryClient();
   const [isAdding, setIsAdding] = useState(false);
@@ -915,6 +983,16 @@ export function Settings(): ReactElement {
           評価レポート生成時に特に注目してほしいポイントを設定できます。
         </p>
         <CustomInstructionsSection />
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-medium text-gray-800">
+          デバッグ
+        </h3>
+        <p className="mb-4 text-sm text-gray-600">
+          開発・デバッグ用のログ出力を設定します。
+        </p>
+        <DebugSection />
       </div>
     </div>
   );

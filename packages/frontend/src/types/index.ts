@@ -49,6 +49,10 @@ export interface Settings {
   data_source_priority: Record<string, string>;
   report_excluded_periods: ExcludedPeriod[];
   user_profile?: UserProfile;
+  /** API取得データをファイルに保存 */
+  debug_api_responses?: boolean;
+  /** チャットデータをファイルに保存 */
+  debug_chat?: boolean;
 }
 
 export interface ApiError {

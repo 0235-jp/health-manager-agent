@@ -10,6 +10,7 @@ import { asyncHandler } from '../middlewares/async-handler.js';
 import { validateBody } from '../middlewares/validation.js';
 import { chatRequestSchema, type ChatRequest } from '../validators/schemas.js';
 import type { ChatParams } from '../../plugins/interfaces/index.js';
+import { logChatExchange } from '../../utils/debug-logger.js';
 
 export const chatRouter = Router();
 
@@ -65,12 +66,16 @@ chatRouter.post(
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
+    // レスポンス全体を収集（デバッグログ用）
+    let fullResponse = '';
+
     try {
       // ストリーミングチャットを実行し、戻り値からセッションIDを取得
       const generator = agent.chat(chatParams);
       let iteratorResult = await generator.next();
 
       while (!iteratorResult.done) {
+        fullResponse += iteratorResult.value;
         res.write(`data: ${JSON.stringify({ type: 'text', content: iteratorResult.value })}\n\n`);
         iteratorResult = await generator.next();
       }
@@ -79,6 +84,16 @@ chatRouter.post(
       const resultSessionId = iteratorResult.value?.sessionId || session_id || '';
 
       res.write(`data: ${JSON.stringify({ type: 'done', session_id: resultSessionId })}\n\n`);
+
+      // デバッグログ出力
+      logChatExchange({
+        message,
+        history,
+        sessionId: resultSessionId,
+        response: fullResponse,
+      }).catch((err) => {
+        console.error('[Chat] Failed to log chat exchange:', err);
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'チャット中にエラーが発生しました';
       res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
