@@ -1,13 +1,17 @@
 import type { ReactElement } from 'react';
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { formatDateTime } from '../lib/date-utils';
+import { formatDateTime, getDatetimeRangeDaysAgo } from '../lib/date-utils';
+import { DateTimePicker } from '../components/ui/DateTimePicker';
 import { formatUnit } from '../lib/unit-utils';
 import { useTimezone } from '../contexts/SettingsContext';
 import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
 import { DataForm } from '../components/data/DataForm';
+import { LineChart, type ChartDataPoint } from '../components/charts/LineChart';
+
+type TabType = 'list' | 'chart';
 
 const PAGE_SIZE = 20;
 
@@ -238,17 +242,150 @@ function DeleteConfirmDialog({
   );
 }
 
+interface ChartContentProps {
+  dataTypeOptions: Array<{ value: string; label: string }>;
+  chartDataType: string;
+  setChartDataType: (value: string) => void;
+  chartStartDate: string;
+  setChartStartDate: (value: string) => void;
+  chartEndDate: string;
+  setChartEndDate: (value: string) => void;
+  chartData: ChartDataPoint[];
+  isLoading: boolean;
+  dataTypeName: string;
+  timezone: string;
+}
+
+function ChartContent({
+  dataTypeOptions,
+  chartDataType,
+  setChartDataType,
+  chartStartDate,
+  setChartStartDate,
+  chartEndDate,
+  setChartEndDate,
+  chartData,
+  isLoading,
+  dataTypeName,
+  timezone,
+}: ChartContentProps): ReactElement {
+  function renderChartArea(): ReactElement {
+    if (!chartDataType) {
+      return (
+        <div className="flex items-center justify-center h-[300px] text-gray-500">
+          データタイプを選択してください
+        </div>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center h-[300px] text-gray-500">
+          読み込み中...
+        </div>
+      );
+    }
+
+    if (chartData.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-[300px] text-gray-500">
+          データがありません
+        </div>
+      );
+    }
+
+    return (
+      <LineChart
+        data={chartData}
+        lines={[
+          {
+            dataKey: 'value',
+            color: '#3b82f6',
+            name: dataTypeName,
+          },
+        ]}
+        height={300}
+        showLegend={true}
+        timezone={timezone}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              データタイプ
+            </label>
+            <select
+              value={chartDataType}
+              onChange={(e) => setChartDataType(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2"
+            >
+              <option value="">選択してください</option>
+              {dataTypeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DateTimePicker
+            value={chartStartDate}
+            onChange={setChartStartDate}
+            timezone={timezone}
+            label="開始日時"
+          />
+          <DateTimePicker
+            value={chartEndDate}
+            onChange={setChartEndDate}
+            timezone={timezone}
+            label="終了日時"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        {renderChartArea()}
+      </div>
+    </div>
+  );
+}
+
 export function HealthData(): ReactElement {
+  const timezone = useTimezone();
+
+  // タブ状態
+  const [activeTab, setActiveTab] = useState<TabType>('list');
+
   const [page, setPage] = useState(0);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editData, setEditData] = useState<HealthDataType | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<HealthDataType | null>(null);
 
-  // フィルター用state
+  // フィルター用state（一覧タブ）
   const [filterDataType, setFilterDataType] = useState('');
   const [filterSource, setFilterSource] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+
+  // グラフ用state
+  const [chartDataType, setChartDataType] = useState('');
+  const [chartStartDate, setChartStartDate] = useState('');
+  const [chartEndDate, setChartEndDate] = useState('');
+  const [chartDatesInitialized, setChartDatesInitialized] = useState(false);
+
+  // タイムゾーンが取得できたらグラフの日付範囲を初期化
+  useEffect(() => {
+    if (timezone && !chartDatesInitialized) {
+      const { start, end } = getDatetimeRangeDaysAgo(30, timezone);
+      setChartStartDate(start);
+      setChartEndDate(end);
+      setChartDatesInitialized(true);
+    }
+  }, [timezone, chartDatesInitialized]);
 
   const queryClient = useQueryClient();
 
@@ -259,8 +396,8 @@ export function HealthData(): ReactElement {
       offset: page * PAGE_SIZE,
       data_type: filterDataType || undefined,
       source: filterSource || undefined,
-      start_date: filterStartDate || undefined,
-      end_date: filterEndDate || undefined,
+      start_date: filterStartDate ? new Date(filterStartDate).toISOString() : undefined,
+      end_date: filterEndDate ? new Date(filterEndDate).toISOString() : undefined,
     }),
   });
 
@@ -301,6 +438,40 @@ export function HealthData(): ReactElement {
     value: dt.name,
     label: `${dt.display_name} (${dt.name})`,
   }));
+
+  // グラフ用データ取得
+  const { data: chartRawData, isLoading: isChartLoading } = useQuery({
+    queryKey: ['health-data-chart', chartDataType, chartStartDate, chartEndDate],
+    queryFn: () => api.healthData.list({
+      data_type: chartDataType,
+      start_date: chartStartDate ? new Date(chartStartDate).toISOString() : undefined,
+      end_date: chartEndDate ? new Date(chartEndDate).toISOString() : undefined,
+    }),
+    enabled: activeTab === 'chart' && !!chartDataType,
+  });
+
+  // グラフ用データ変換
+  const chartData = useMemo((): ChartDataPoint[] => {
+    if (!chartRawData?.data) return [];
+
+    // 日付ごとに最新の値を取得
+    const dateMap = new Map<string, { value: number; timestamp: string }>();
+    for (const record of chartRawData.data) {
+      const date = record.recorded_at.split('T')[0];
+      const existing = dateMap.get(date);
+      if (!existing || record.recorded_at > existing.timestamp) {
+        dateMap.set(date, { value: record.value, timestamp: record.recorded_at });
+      }
+    }
+
+    // 日付順にソートしてChartDataPoint[]に変換
+    return Array.from(dateMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, { value }]) => ({ date, value }));
+  }, [chartRawData]);
+
+  // 選択中のデータタイプの表示名
+  const chartDataTypeName = dataTypeDisplayMap.get(chartDataType) || chartDataType;
 
   // フィルター変更時にページをリセット
   function updateFilterAndResetPage(setter: (value: string) => void, value: string): void {
@@ -357,71 +528,113 @@ export function HealthData(): ReactElement {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap gap-4">
-          <select
-            value={filterDataType}
-            onChange={(e) => updateFilterAndResetPage(setFilterDataType, e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2"
-          >
-            <option value="">すべてのタイプ</option>
-            {dataTypeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filterSource}
-            onChange={(e) => updateFilterAndResetPage(setFilterSource, e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2"
-          >
-            <option value="">すべてのソース</option>
-            {sourceOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={filterStartDate}
-            onChange={(e) => updateFilterAndResetPage(setFilterStartDate, e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2"
-          />
-          <input
-            type="date"
-            value={filterEndDate}
-            onChange={(e) => updateFilterAndResetPage(setFilterEndDate, e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2"
-          />
-          <button
-            onClick={resetFilters}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
-          >
-            リセット
-          </button>
-        </div>
+      {/* タブ切り替え */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'list'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          一覧
+        </button>
+        <button
+          onClick={() => setActiveTab('chart')}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'chart'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          グラフ
+        </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <DataTableContent
-          isLoading={isLoading}
-          error={error}
-          data={data}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          formatDataType={formatDataType}
+      {activeTab === 'list' ? (
+        <>
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap gap-4">
+              <select
+                value={filterDataType}
+                onChange={(e) => updateFilterAndResetPage(setFilterDataType, e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2"
+              >
+                <option value="">すべてのタイプ</option>
+                {dataTypeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filterSource}
+                onChange={(e) => updateFilterAndResetPage(setFilterSource, e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2"
+              >
+                <option value="">すべてのソース</option>
+                {sourceOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <DateTimePicker
+                value={filterStartDate}
+                onChange={(v) => updateFilterAndResetPage(setFilterStartDate, v)}
+                timezone={timezone}
+                label="開始日時"
+              />
+              <DateTimePicker
+                value={filterEndDate}
+                onChange={(v) => updateFilterAndResetPage(setFilterEndDate, v)}
+                timezone={timezone}
+                label="終了日時"
+              />
+              <button
+                onClick={resetFilters}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
+              >
+                リセット
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <DataTableContent
+              isLoading={isLoading}
+              error={error}
+              data={data}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              formatDataType={formatDataType}
+            />
+            {data && (
+              <Pagination
+                page={page}
+                total={data.pagination.total}
+                onPrevious={() => setPage((p) => Math.max(0, p - 1))}
+                onNext={() => setPage((p) => p + 1)}
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <ChartContent
+          dataTypeOptions={dataTypeOptions}
+          chartDataType={chartDataType}
+          setChartDataType={setChartDataType}
+          chartStartDate={chartStartDate}
+          setChartStartDate={setChartStartDate}
+          chartEndDate={chartEndDate}
+          setChartEndDate={setChartEndDate}
+          chartData={chartData}
+          isLoading={isChartLoading}
+          dataTypeName={chartDataTypeName}
+          timezone={timezone}
         />
-        {data && (
-          <Pagination
-            page={page}
-            total={data.pagination.total}
-            onPrevious={() => setPage((p) => Math.max(0, p - 1))}
-            onNext={() => setPage((p) => p + 1)}
-          />
-        )}
-      </div>
+      )}
 
       <DataForm
         isOpen={isFormOpen}

@@ -174,3 +174,51 @@ export function getTodayDatetimeRange(timezone: string): { start: string; end: s
     end: `${datePrefix}T23:59`,
   };
 }
+
+/**
+ * 指定タイムゾーンでの「N日前から今日まで」の日付範囲をdatetime-local形式で取得
+ *
+ * @param daysAgo 何日前から開始するか
+ * @param timezone タイムゾーン名（例: 'Asia/Tokyo'）
+ * @returns datetime-local形式の開始・終了時刻
+ */
+export function getDatetimeRangeDaysAgo(
+  daysAgo: number,
+  timezone: string
+): { start: string; end: string } {
+  const now = new Date();
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  // 今日の日付（指定タイムゾーン）
+  const today = formatter.format(now);
+
+  // N日前の日付（指定タイムゾーン）
+  const pastDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+  const startDate = formatter.format(pastDate);
+
+  return {
+    start: `${startDate}T00:00`,
+    end: `${today}T23:59`,
+  };
+}
+
+/**
+ * 指定タイムゾーンでの「今日」の日付を YYYY-MM-DD 形式で取得
+ *
+ * @param timezone タイムゾーン名（例: 'Asia/Tokyo'）
+ * @returns YYYY-MM-DD 形式の日付文字列
+ */
+export function getTodayDateString(timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
