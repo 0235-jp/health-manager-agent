@@ -85,15 +85,8 @@ healthDataRouter.post(
   validateBody(healthDataCreateSchema),
   asyncHandler((req, res) => {
     const data = req.body as HealthDataCreate;
+    // UPSERT: 既存データがある場合は更新、なければ作成
     const record = healthDataRepository.create(data);
-
-    if (!record) {
-      res.status(409).json({
-        error: { message: 'Duplicate data: same data_type and recorded_at already exists' },
-      });
-      return;
-    }
-
     res.status(201).json(record);
   })
 );

@@ -242,7 +242,7 @@ export class Scheduler {
     // 4. 結果に応じて状態更新 & データ保存
     let totalFetched = 0;
     let inserted = 0;
-    const allData: Array<{ data_type: string; value: number; unit: string; source: string; recorded_at: string }> = [];
+    const allData: HealthDataItem[] = [];
 
     for (const result of results) {
       if (result.success) {
@@ -278,7 +278,7 @@ export class Scheduler {
 
       const batchResult = healthDataRepository.createBatch(filteredData);
       inserted = batchResult.inserted;
-      console.log(`[Scheduler] Saved ${inserted}/${filteredData.length} records (${filteredData.length - inserted} duplicates skipped)`);
+      console.log(`[Scheduler] Upserted ${inserted}/${filteredData.length} records`);
 
       // 6. 通知イベント発火（data:fetched）
       const dataTypes = [...new Set(allData.map(d => d.data_type))];
@@ -404,7 +404,7 @@ export class Scheduler {
     );
 
     // データを収集
-    const allData: Array<{ data_type: string; value: number; unit: string; source: string; recorded_at: string }> = [];
+    const allData: HealthDataItem[] = [];
 
     for (const result of results) {
       if (!result.success && result.errors) {

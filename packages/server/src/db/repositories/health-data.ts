@@ -68,6 +68,17 @@ function collectFieldUpdates(data: Record<string, unknown>, fields: string[]): F
   return updates;
 }
 
+const DEFAULT_SOURCE = 'manual';
+
+const UPSERT_SQL = `
+  INSERT INTO health_data (data_type, value, unit, source, recorded_at)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(data_type, source, recorded_at) DO UPDATE SET
+    value = excluded.value,
+    unit = excluded.unit,
+    updated_at = datetime('now')
+`;
+
 export const healthDataRepository = {
   findAll(query: HealthDataQuery): PaginatedResult<HealthDataRecord> {
     const db = getDatabase();
@@ -112,43 +123,40 @@ export const healthDataRepository = {
   },
 
   /**
-   * データを作成（INSERT OR IGNORE で重複をスキップ）
-   * @returns 作成されたレコード、または重複の場合はnull
+   * データを作成または更新（UPSERT）
+   * 同じ (data_type, source, recorded_at) の組み合わせが存在する場合は値を更新
+   * @returns 作成または更新されたレコード
    */
-  create(data: HealthDataCreate & { source?: string }): HealthDataRecord | null {
+  create(data: HealthDataCreate & { source?: string }): HealthDataRecord {
     const db = getDatabase();
-    const source = data.source || 'manual';
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO health_data (data_type, value, unit, source, recorded_at)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(data.data_type, data.value, data.unit ?? null, source, data.recorded_at);
-    if (result.changes === 0) {
-      return null; // Already exists (duplicate)
-    }
-    return this.findById(result.lastInsertRowid as number)!;
+    const source = data.source || DEFAULT_SOURCE;
+    const stmt = db.prepare(UPSERT_SQL);
+    stmt.run(data.data_type, data.value, data.unit ?? null, source, data.recorded_at);
+    // UPSERT後はユニークキーで検索（lastInsertRowidは更新時に信頼できない）
+    const findStmt = db.prepare(
+      'SELECT * FROM health_data WHERE data_type = ? AND source = ? AND recorded_at = ?'
+    );
+    return findStmt.get(data.data_type, source, data.recorded_at) as HealthDataRecord;
   },
 
   /**
-   * バッチでデータを作成（INSERT OR IGNORE で重複をスキップ）
-   * @returns 処理結果（合計件数、挿入件数）
+   * バッチでデータを作成または更新（UPSERT）
+   * 同じ (data_type, source, recorded_at) の組み合わせが存在する場合は値を更新
+   * @returns 処理結果（合計件数、挿入/更新件数）
    */
   createBatch(items: Array<HealthDataCreate & { source?: string }>): { total: number; inserted: number } {
     const db = getDatabase();
     const transaction = db.transaction((data: Array<HealthDataCreate & { source?: string }>) => {
-      const stmt = db.prepare(`
-        INSERT OR IGNORE INTO health_data (data_type, value, unit, source, recorded_at)
-        VALUES (?, ?, ?, ?, ?)
-      `);
-      let inserted = 0;
+      const stmt = db.prepare(UPSERT_SQL);
+      let upserted = 0;
       for (const item of data) {
-        const source = item.source || 'manual';
+        const source = item.source || DEFAULT_SOURCE;
         const result = stmt.run(item.data_type, item.value, item.unit ?? null, source, item.recorded_at);
         if (result.changes > 0) {
-          inserted++;
+          upserted++;
         }
       }
-      return inserted;
+      return upserted;
     });
     const inserted = transaction(items);
     return { total: items.length, inserted };
