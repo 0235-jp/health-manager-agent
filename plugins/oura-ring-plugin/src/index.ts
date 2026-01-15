@@ -24,7 +24,14 @@ import {
   mapSleepTime,
   mapEnhancedTags,
   mapRestModePeriods,
+  mapHeartRateTimeseries,
+  mapSleepHeartRateTimeseries,
+  mapSleepHrvTimeseries,
+  mapSleepPhaseTimeseries,
+  mapMetTimeseries,
+  mapActivityClassTimeseries,
   type HealthDataInput,
+  type TimeseriesDataInput,
 } from './data-mapper.js';
 
 // プラグインインターフェースの型定義
@@ -59,6 +66,7 @@ interface FetchOptions {
 interface FetchResult {
   success: boolean;
   data: HealthDataInput[];
+  timeseriesData?: TimeseriesDataInput[];
   errors?: string[];
   nextFetchAt?: Date;
 }
@@ -130,6 +138,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     const errors: string[] = [];
     const allData: HealthDataInput[] = [];
+    const allTimeseriesData: TimeseriesDataInput[] = [];
 
     // デフォルトの日付範囲（過去7日間）
     const endDate = options.endDate || new Date();
@@ -141,26 +150,71 @@ class OuraRingPlugin implements DataSourcePlugin {
       ? new Set(options.dataTypes)
       : null;
 
+    // 時系列データタイプの判定用
+    const timeseriesTypes = new Set([
+      'heart_rate_timeseries',
+      'oura:sleep_hr',
+      'oura:sleep_hrv',
+      'oura:met',
+      'oura:sleep_phase',
+      'oura:activity_class',
+    ]);
+
+    // 睡眠関連のデータタイプ
+    const sleepDataTypes = [
+      'sleep_duration', 'deep_sleep', 'rem_sleep', 'light_sleep',
+      'sleep_efficiency', 'sleep_latency', 'time_in_bed', 'awake_time',
+      'respiratory_rate', 'oura:sleep_score', 'oura:bedtime_start', 'oura:bedtime_end',
+      'oura:restless_periods', 'oura:lowest_hr', 'oura:sleep_hr_avg', 'oura:sleep_hrv_avg',
+      'oura:sleep_hr', 'oura:sleep_hrv', 'oura:sleep_phase',
+    ];
+
     // 各エンドポイントからデータを取得
     try {
       // Daily Sleep & Sleep Periods
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['sleep_duration', 'deep_sleep', 'rem_sleep', 'oura:sleep_score'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, sleepDataTypes)) {
         const [dailySleep, sleepPeriods] = await Promise.all([
           this.client.getDailySleep(startDate, endDate),
           this.client.getSleepPeriods(startDate, endDate),
         ]);
         allData.push(...mapDailySleep(dailySleep));
         allData.push(...mapSleepPeriods(sleepPeriods));
+
+        // 睡眠時系列データ
+        if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:sleep_hr'])) {
+          allTimeseriesData.push(...mapSleepHeartRateTimeseries(sleepPeriods));
+        }
+        if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:sleep_hrv'])) {
+          allTimeseriesData.push(...mapSleepHrvTimeseries(sleepPeriods));
+        }
+        if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:sleep_phase'])) {
+          allTimeseriesData.push(...mapSleepPhaseTimeseries(sleepPeriods));
+        }
       }
     } catch (error) {
       errors.push(`Sleep data fetch failed: ${this.getErrorMessage(error)}`);
     }
 
+    // 活動関連のデータタイプ
+    const activityDataTypes = [
+      'steps', 'calories_burned', 'oura:activity_score', 'oura:active_calories',
+      'oura:walking_distance', 'oura:high_activity_time', 'oura:medium_activity_time',
+      'oura:low_activity_time', 'sedentary_time', 'oura:met', 'oura:activity_class',
+    ];
+
     try {
       // Daily Activity
-      if (!requestedTypes || this.hasAnyType(requestedTypes, ['steps', 'calories_burned', 'oura:activity_score', 'oura:active_calories'])) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, activityDataTypes)) {
         const activity = await this.client.getDailyActivity(startDate, endDate);
         allData.push(...mapDailyActivity(activity));
+
+        // 活動時系列データ
+        if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:met'])) {
+          allTimeseriesData.push(...mapMetTimeseries(activity));
+        }
+        if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:activity_class'])) {
+          allTimeseriesData.push(...mapActivityClassTimeseries(activity));
+        }
       }
     } catch (error) {
       errors.push(`Activity data fetch failed: ${this.getErrorMessage(error)}`);
@@ -178,10 +232,15 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Heart Rate（過去24時間のみ、大量のデータになるため）
-      if (!requestedTypes || requestedTypes.has('heart_rate')) {
+      if (!requestedTypes || requestedTypes.has('heart_rate') || requestedTypes.has('heart_rate_timeseries')) {
         const hrStartDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
         const heartRate = await this.client.getHeartRate(hrStartDate, endDate);
         allData.push(...mapHeartRate(heartRate));
+
+        // 心拍数時系列データ
+        if (!requestedTypes || requestedTypes.has('heart_rate_timeseries')) {
+          allTimeseriesData.push(...mapHeartRateTimeseries(heartRate));
+        }
       }
     } catch (error) {
       errors.push(`Heart rate data fetch failed: ${this.getErrorMessage(error)}`);
@@ -199,7 +258,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     try {
       // Daily Stress
-      if (!requestedTypes || requestedTypes.has('oura:stress_level')) {
+      if (!requestedTypes || this.hasAnyType(requestedTypes, ['oura:stress_level', 'oura:recovery_time', 'oura:stress_summary'])) {
         const stress = await this.client.getDailyStress(startDate, endDate);
         allData.push(...mapDailyStress(stress));
       }
@@ -289,6 +348,7 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     // 重複を排除（同じdataType + recordedAt）
     const uniqueData = this.deduplicateData(allData);
+    const uniqueTimeseriesData = this.deduplicateTimeseriesData(allTimeseriesData);
 
     // 次回の取得時刻を計算
     const nextFetchAt = new Date(
@@ -298,6 +358,7 @@ class OuraRingPlugin implements DataSourcePlugin {
     return {
       success: errors.length === 0,
       data: uniqueData,
+      timeseriesData: uniqueTimeseriesData.length > 0 ? uniqueTimeseriesData : undefined,
       errors: errors.length > 0 ? errors : undefined,
       nextFetchAt,
     };
@@ -339,6 +400,22 @@ class OuraRingPlugin implements DataSourcePlugin {
 
     for (const item of data) {
       const key = `${item.dataType}_${item.recordedAt.toISOString()}`;
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      }
+    }
+
+    return Array.from(seen.values());
+  }
+
+  /**
+   * 時系列データの重複を排除
+   */
+  private deduplicateTimeseriesData(data: TimeseriesDataInput[]): TimeseriesDataInput[] {
+    const seen = new Map<string, TimeseriesDataInput>();
+
+    for (const item of data) {
+      const key = `${item.dataType}_${item.timestamp.toISOString()}`;
       if (!seen.has(key)) {
         seen.set(key, item);
       }

@@ -25,3 +25,9 @@ export {
   executeGetHealthDataTrend,
   type GetHealthDataTrendArgs,
 } from './get-health-data-trend.js';
+
+export {
+  getHealthDataTimeseriesTool,
+  executeGetHealthDataTimeseries,
+  type GetHealthDataTimeseriesArgs,
+} from './get-health-data-timeseries.js';

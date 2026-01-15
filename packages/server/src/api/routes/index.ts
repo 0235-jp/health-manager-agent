@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { healthDataRouter } from './health-data.js';
+import { healthDataTimeseriesRouter } from './health-data-timeseries.js';
 import { settingsRouter } from './settings.js';
 import { customInstructionsRouter } from './custom-instructions.js';
 import { customDataTypesRouter } from './custom-data-types.js';
@@ -12,6 +13,7 @@ import { chatRouter } from './chat.js';
 export const router = Router();
 
 router.use('/health-data', healthDataRouter);
+router.use('/health-data/timeseries', healthDataTimeseriesRouter);
 router.use('/settings', settingsRouter);
 router.use('/custom-instructions', customInstructionsRouter);
 router.use('/custom-data-types', customDataTypesRouter);

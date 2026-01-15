@@ -20,6 +20,7 @@ import type {
   PluginManifest,
   PluginType,
   ReportContent,
+  TimeseriesDataInput,
 } from './interfaces/index.js';
 import { pluginsRepository, type PluginRecord } from '../db/repositories/plugins.js';
 import { customInstructionsRepository } from '../db/repositories/custom-instructions.js';
@@ -263,18 +264,20 @@ export class PluginManager {
   }
 
   /**
-   * supportedDataTypesをDBにマイグレーション（既存プラグイン対応）
+   * supportedDataTypesをDBに同期（プラグイン更新時にも反映）
    */
   private migrateSupportedDataTypes(
     manifest: PluginManifest,
     pluginRecord: PluginRecord
   ): void {
-    const extendedManifest = manifest as PluginManifest & { supportedDataTypes?: unknown[] };
-    if (extendedManifest.supportedDataTypes && !pluginRecord.supported_data_types) {
-      pluginsRepository.update(pluginRecord.name, {
-        supportedDataTypes: extendedManifest.supportedDataTypes,
-      });
+    if (manifest.type !== 'data-source') {
+      return;
     }
+
+    const dataSourceManifest = manifest as import('./interfaces/index.js').DataSourceManifest;
+    pluginsRepository.update(pluginRecord.name, {
+      supportedDataTypes: dataSourceManifest.supportedDataTypes,
+    });
   }
 
   /**
@@ -524,6 +527,7 @@ export class PluginManager {
           pluginName,
           success: result.success,
           data: result.data,
+          timeseriesData: result.timeseriesData,
           errors: result.errors,
           fetchedAt,
         });

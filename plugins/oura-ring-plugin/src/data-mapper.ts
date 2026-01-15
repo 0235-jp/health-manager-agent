@@ -29,6 +29,20 @@ export interface HealthDataInput {
 }
 
 /**
+ * 時系列データ入力
+ */
+export interface TimeseriesDataInput {
+  dataType: string;
+  timestamp: Date;
+  value: number;
+  intervalSeconds: number;
+  source?: string;
+  periodDate?: string;
+  parentId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * 秒を時間に変換
  */
 function secondsToHours(seconds: number): number {
@@ -105,6 +119,64 @@ export function mapSleepPeriods(data: SleepPeriodData[]): HealthDataInput[] {
       metadata: { source: 'sleep', id: item.id },
     });
 
+    // 浅い睡眠
+    results.push({
+      dataType: 'light_sleep',
+      value: secondsToHours(item.light_sleep_duration),
+      unit: 'hours',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id },
+    });
+
+    // 睡眠効率
+    if (item.efficiency !== null) {
+      results.push({
+        dataType: 'sleep_efficiency',
+        value: item.efficiency,
+        unit: '%',
+        recordedAt,
+        metadata: { source: 'sleep', id: item.id },
+      });
+    }
+
+    // 入眠潜時
+    results.push({
+      dataType: 'sleep_latency',
+      value: Math.round(item.latency / 60),
+      unit: 'minutes',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id },
+    });
+
+    // 在床時間
+    results.push({
+      dataType: 'time_in_bed',
+      value: secondsToHours(item.time_in_bed),
+      unit: 'hours',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id },
+    });
+
+    // 中途覚醒時間
+    results.push({
+      dataType: 'awake_time',
+      value: Math.round(item.awake_time / 60),
+      unit: 'minutes',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id },
+    });
+
+    // 呼吸数
+    if (item.average_breath !== null) {
+      results.push({
+        dataType: 'respiratory_rate',
+        value: item.average_breath,
+        unit: 'brpm',
+        recordedAt,
+        metadata: { source: 'sleep', id: item.id },
+      });
+    }
+
     // 平均心拍数（睡眠中）
     if (item.average_heart_rate !== null) {
       results.push({
@@ -114,7 +186,65 @@ export function mapSleepPeriods(data: SleepPeriodData[]): HealthDataInput[] {
         recordedAt,
         metadata: { source: 'sleep', id: item.id, context: 'sleeping' },
       });
+
+      // Oura固有: 睡眠中平均心拍
+      results.push({
+        dataType: 'oura:sleep_hr_avg',
+        value: item.average_heart_rate,
+        unit: 'bpm',
+        recordedAt,
+        metadata: { source: 'sleep', id: item.id },
+      });
     }
+
+    // 最低心拍数
+    if (item.lowest_heart_rate !== null) {
+      results.push({
+        dataType: 'oura:lowest_hr',
+        value: item.lowest_heart_rate,
+        unit: 'bpm',
+        recordedAt,
+        metadata: { source: 'sleep', id: item.id },
+      });
+    }
+
+    // 平均HRV
+    if (item.average_hrv !== null) {
+      results.push({
+        dataType: 'oura:sleep_hrv_avg',
+        value: item.average_hrv,
+        unit: 'ms',
+        recordedAt,
+        metadata: { source: 'sleep', id: item.id },
+      });
+    }
+
+    // 不穏睡眠回数
+    results.push({
+      dataType: 'oura:restless_periods',
+      value: item.restless_periods,
+      unit: 'count',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id },
+    });
+
+    // 就寝時刻（Unixタイムスタンプとして保存）
+    results.push({
+      dataType: 'oura:bedtime_start',
+      value: new Date(item.bedtime_start).getTime() / 1000,
+      unit: 'datetime',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id, bedtime_start: item.bedtime_start },
+    });
+
+    // 起床時刻（Unixタイムスタンプとして保存）
+    results.push({
+      dataType: 'oura:bedtime_end',
+      value: new Date(item.bedtime_end).getTime() / 1000,
+      unit: 'datetime',
+      recordedAt,
+      metadata: { source: 'sleep', id: item.id, bedtime_end: item.bedtime_end },
+    });
   }
 
   return results;
@@ -162,6 +292,61 @@ export function mapDailyActivity(data: DailyActivityData[]): HealthDataInput[] {
         dataType: 'oura:activity_score',
         value: item.score,
         unit: 'score',
+        recordedAt,
+        metadata: { source: 'daily_activity', id: item.id },
+      });
+    }
+
+    // 歩行相当距離
+    if (item.equivalent_walking_distance !== undefined) {
+      results.push({
+        dataType: 'oura:walking_distance',
+        value: item.equivalent_walking_distance,
+        unit: 'meters',
+        recordedAt,
+        metadata: { source: 'daily_activity', id: item.id },
+      });
+    }
+
+    // 高強度活動時間
+    if (item.high_activity_time !== undefined) {
+      results.push({
+        dataType: 'oura:high_activity_time',
+        value: Math.round(item.high_activity_time / 60),
+        unit: 'minutes',
+        recordedAt,
+        metadata: { source: 'daily_activity', id: item.id },
+      });
+    }
+
+    // 中強度活動時間
+    if (item.medium_activity_time !== undefined) {
+      results.push({
+        dataType: 'oura:medium_activity_time',
+        value: Math.round(item.medium_activity_time / 60),
+        unit: 'minutes',
+        recordedAt,
+        metadata: { source: 'daily_activity', id: item.id },
+      });
+    }
+
+    // 低強度活動時間
+    if (item.low_activity_time !== undefined) {
+      results.push({
+        dataType: 'oura:low_activity_time',
+        value: Math.round(item.low_activity_time / 60),
+        unit: 'minutes',
+        recordedAt,
+        metadata: { source: 'daily_activity', id: item.id },
+      });
+    }
+
+    // 座位時間
+    if (item.sedentary_time !== undefined) {
+      results.push({
+        dataType: 'sedentary_time',
+        value: secondsToHours(item.sedentary_time),
+        unit: 'hours',
         recordedAt,
         metadata: { source: 'daily_activity', id: item.id },
       });
@@ -290,6 +475,34 @@ export function mapDailyStress(data: DailyStressData[]): HealthDataInput[] {
           recovery_high: item.recovery_high,
           day_summary: item.day_summary,
         },
+      });
+    }
+
+    // 回復時間
+    if (item.recovery_high !== null) {
+      results.push({
+        dataType: 'oura:recovery_time',
+        value: item.recovery_high,
+        unit: 'seconds',
+        recordedAt,
+        metadata: { source: 'daily_stress', id: item.id },
+      });
+    }
+
+    // ストレス要約（day_summaryを数値化）
+    if (item.day_summary !== null) {
+      const summaryValues: Record<string, number> = {
+        'restored': 1,
+        'normal': 2,
+        'stressful': 3,
+      };
+      const summaryValue = summaryValues[item.day_summary] ?? 0;
+      results.push({
+        dataType: 'oura:stress_summary',
+        value: summaryValue,
+        unit: 'text',
+        recordedAt,
+        metadata: { source: 'daily_stress', id: item.id, day_summary: item.day_summary },
       });
     }
   }
@@ -562,6 +775,220 @@ export function mapRestModePeriods(data: RestModePeriodData[]): HealthDataInput[
         episodes: item.episodes,
       },
     });
+  }
+
+  return results;
+}
+
+// ==================== 時系列データマッピング ====================
+
+/**
+ * Heart Rateデータを時系列として変換
+ */
+export function mapHeartRateTimeseries(data: HeartRateData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    const timestamp = new Date(item.timestamp);
+    const periodDate = item.timestamp.split('T')[0];
+
+    results.push({
+      dataType: 'heart_rate_timeseries',
+      timestamp,
+      value: item.bpm,
+      intervalSeconds: 60,
+      source: 'oura-ring-plugin',
+      periodDate,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Sleep Period内の心拍数時系列データを変換
+ */
+export function mapSleepHeartRateTimeseries(data: SleepPeriodData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    if (!item.heart_rate?.items) continue;
+
+    const bedtimeStart = new Date(item.bedtime_start);
+    const periodDate = item.day;
+    const intervalSeconds = item.heart_rate.interval || 300;
+
+    for (let i = 0; i < item.heart_rate.items.length; i++) {
+      const value = item.heart_rate.items[i];
+      if (value === null) continue;
+
+      const timestamp = new Date(bedtimeStart.getTime() + i * intervalSeconds * 1000);
+
+      results.push({
+        dataType: 'oura:sleep_hr',
+        timestamp,
+        value,
+        intervalSeconds,
+        source: 'oura-ring-plugin',
+        periodDate,
+        parentId: item.id,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Sleep Period内のHRV時系列データを変換
+ */
+export function mapSleepHrvTimeseries(data: SleepPeriodData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    if (!item.hrv?.items) continue;
+
+    const bedtimeStart = new Date(item.bedtime_start);
+    const periodDate = item.day;
+    const intervalSeconds = item.hrv.interval || 300;
+
+    for (let i = 0; i < item.hrv.items.length; i++) {
+      const value = item.hrv.items[i];
+      if (value === null) continue;
+
+      const timestamp = new Date(bedtimeStart.getTime() + i * intervalSeconds * 1000);
+
+      results.push({
+        dataType: 'oura:sleep_hrv',
+        timestamp,
+        value,
+        intervalSeconds,
+        source: 'oura-ring-plugin',
+        periodDate,
+        parentId: item.id,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * 睡眠フェーズの数値変換
+ */
+function sleepPhaseToNumber(phase: string): number {
+  const phases: Record<string, number> = {
+    'deep': 1,
+    'light': 2,
+    'rem': 3,
+    'awake': 4,
+  };
+  return phases[phase] ?? 0;
+}
+
+/**
+ * Sleep Period内の睡眠フェーズ時系列データを変換
+ */
+export function mapSleepPhaseTimeseries(data: SleepPeriodData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    if (!item.sleep_phase_5_min) continue;
+
+    const bedtimeStart = new Date(item.bedtime_start);
+    const periodDate = item.day;
+    const intervalSeconds = 300; // 5分間隔
+
+    // sleep_phase_5_minは文字列の配列（例: "4443322211..."）
+    const phases = item.sleep_phase_5_min.split('');
+
+    for (let i = 0; i < phases.length; i++) {
+      const phaseNum = parseInt(phases[i], 10);
+      if (isNaN(phaseNum)) continue;
+
+      const timestamp = new Date(bedtimeStart.getTime() + i * intervalSeconds * 1000);
+
+      results.push({
+        dataType: 'oura:sleep_phase',
+        timestamp,
+        value: phaseNum,
+        intervalSeconds,
+        source: 'oura-ring-plugin',
+        periodDate,
+        parentId: item.id,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Daily ActivityのMET時系列データを変換
+ */
+export function mapMetTimeseries(data: DailyActivityData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    if (!item.met?.items) continue;
+
+    const dayStart = parseDate(item.day);
+    const periodDate = item.day;
+    const intervalSeconds = item.met.interval || 60;
+
+    for (let i = 0; i < item.met.items.length; i++) {
+      const value = item.met.items[i];
+      if (value === null) continue;
+
+      const timestamp = new Date(dayStart.getTime() + i * intervalSeconds * 1000);
+
+      results.push({
+        dataType: 'oura:met',
+        timestamp,
+        value,
+        intervalSeconds,
+        source: 'oura-ring-plugin',
+        periodDate,
+        parentId: item.id,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Daily Activityのアクティビティクラス時系列データを変換
+ */
+export function mapActivityClassTimeseries(data: DailyActivityData[]): TimeseriesDataInput[] {
+  const results: TimeseriesDataInput[] = [];
+
+  for (const item of data) {
+    if (!item.class_5_min) continue;
+
+    const dayStart = parseDate(item.day);
+    const periodDate = item.day;
+    const intervalSeconds = 300; // 5分間隔
+
+    // class_5_minは文字列（例: "0011122233..."）
+    const classes = item.class_5_min.split('');
+
+    for (let i = 0; i < classes.length; i++) {
+      const classNum = parseInt(classes[i], 10);
+      if (isNaN(classNum)) continue;
+
+      const timestamp = new Date(dayStart.getTime() + i * intervalSeconds * 1000);
+
+      results.push({
+        dataType: 'oura:activity_class',
+        timestamp,
+        value: classNum,
+        intervalSeconds,
+        source: 'oura-ring-plugin',
+        periodDate,
+        parentId: item.id,
+      });
+    }
   }
 
   return results;

@@ -11,6 +11,7 @@ import cron from 'node-cron';
 import { PluginManager } from '../plugins/manager.js';
 import { reportsRepository } from '../db/repositories/reports.js';
 import { healthDataRepository } from '../db/repositories/health-data.js';
+import { healthDataTimeseriesRepository, type TimeseriesCreate } from '../db/repositories/health-data-timeseries.js';
 import { settingsRepository } from '../db/repositories/settings.js';
 import { pluginCollectionStateRepository } from '../db/repositories/plugin-collection-state.js';
 import { pluginsRepository } from '../db/repositories/plugins.js';
@@ -22,6 +23,8 @@ export interface BackfillResult {
   inserted: number;
   skipped: number;
   errors: Array<{ pluginName: string; error: string }>;
+  timeseriesFetched?: number;
+  timeseriesInserted?: number;
 }
 
 /** ヘルスデータの内部型 */
@@ -94,6 +97,8 @@ export interface DataCollectionResult {
   totalFetched: number;
   inserted: number;
   skipped: number;
+  timeseriesFetched?: number;
+  timeseriesInserted?: number;
 }
 
 /** レポート生成除外時間帯 */
@@ -242,18 +247,22 @@ export class Scheduler {
     // 4. 結果に応じて状態更新 & データ保存
     let totalFetched = 0;
     let inserted = 0;
+    let timeseriesFetched = 0;
+    let timeseriesInserted = 0;
     const allData: HealthDataItem[] = [];
+    const allTimeseriesData: TimeseriesCreate[] = [];
 
     for (const result of results) {
       if (result.success) {
         pluginCollectionStateRepository.markSuccess(result.pluginName, result.fetchedAt);
-        console.log(`[Scheduler] Plugin ${result.pluginName}: fetched ${result.data.length} records`);
+        const timeseriesCount = result.timeseriesData?.length || 0;
+        console.log(`[Scheduler] Plugin ${result.pluginName}: fetched ${result.data.length} records, ${timeseriesCount} timeseries`);
       } else {
         pluginCollectionStateRepository.markFailure(result.pluginName, result.fetchedAt);
         console.error(`[Scheduler] Plugin ${result.pluginName} failed:`, result.errors);
       }
 
-      // データを収集
+      // 日次データを収集
       for (const item of result.data) {
         totalFetched++;
         allData.push({
@@ -263,6 +272,22 @@ export class Scheduler {
           source: result.pluginName,
           recorded_at: item.recordedAt.toISOString(),
         });
+      }
+
+      // 時系列データを収集
+      if (result.timeseriesData) {
+        for (const item of result.timeseriesData) {
+          timeseriesFetched++;
+          allTimeseriesData.push({
+            data_type: item.dataType,
+            value: item.value,
+            source: item.source || result.pluginName,
+            interval_seconds: item.intervalSeconds,
+            recorded_at: item.timestamp.toISOString(),
+            period_date: item.periodDate || item.timestamp.toISOString().split('T')[0],
+            parent_id: item.parentId,
+          });
+        }
       }
     }
 
@@ -291,6 +316,13 @@ export class Scheduler {
           dataTypes,
         },
       });
+    }
+
+    // 5.1 時系列データをDB保存
+    if (allTimeseriesData.length > 0) {
+      const timeseriesResult = healthDataTimeseriesRepository.createBatch(allTimeseriesData);
+      timeseriesInserted = timeseriesResult.inserted;
+      console.log(`[Scheduler] Upserted ${timeseriesInserted}/${allTimeseriesData.length} timeseries records`);
     }
 
     // 7. 取得時レポート生成（Agentプラグインがある場合のみ）
@@ -348,6 +380,8 @@ export class Scheduler {
       totalFetched,
       inserted,
       skipped: totalFetched - inserted,
+      timeseriesFetched,
+      timeseriesInserted,
     };
   }
 
@@ -405,6 +439,7 @@ export class Scheduler {
 
     // データを収集
     const allData: HealthDataItem[] = [];
+    const allTimeseriesData: TimeseriesCreate[] = [];
 
     for (const result of results) {
       if (!result.success && result.errors) {
@@ -423,10 +458,27 @@ export class Scheduler {
           recorded_at: item.recordedAt.toISOString(),
         });
       }
+
+      // 時系列データを収集
+      if (result.timeseriesData) {
+        for (const item of result.timeseriesData) {
+          allTimeseriesData.push({
+            data_type: item.dataType,
+            value: item.value,
+            source: item.source || result.pluginName,
+            interval_seconds: item.intervalSeconds,
+            recorded_at: item.timestamp.toISOString(),
+            period_date: item.periodDate || item.timestamp.toISOString().split('T')[0],
+            parent_id: item.parentId,
+          });
+        }
+      }
     }
 
     // 優先度設定に基づいてフィルタしてからDB保存
     let inserted = 0;
+    let timeseriesInserted = 0;
+
     if (allData.length > 0) {
       const priority = (settingsRepository.get('data_source_priority') as Record<string, string>) || {};
       const filteredData = filterByDataSourcePriority(allData, priority);
@@ -440,6 +492,13 @@ export class Scheduler {
       inserted = batchResult.inserted;
     }
 
+    // 時系列データをDB保存
+    if (allTimeseriesData.length > 0) {
+      const timeseriesResult = healthDataTimeseriesRepository.createBatch(allTimeseriesData);
+      timeseriesInserted = timeseriesResult.inserted;
+      console.log(`[Scheduler] Backfill: Upserted ${timeseriesInserted}/${allTimeseriesData.length} timeseries records`);
+    }
+
     const skipped = allData.length - inserted;
     console.log(`[Scheduler] Backfill completed: ${inserted}/${allData.length} records inserted (${skipped} filtered/duplicates)`);
 
@@ -448,6 +507,8 @@ export class Scheduler {
       inserted,
       skipped,
       errors,
+      timeseriesFetched: allTimeseriesData.length,
+      timeseriesInserted,
     };
   }
 

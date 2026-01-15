@@ -13,6 +13,8 @@ export interface DataTypeDefinition {
   category: string; // 身体, 心臓, 睡眠, 活動, 体温, 精神
   unit: string;
   description?: string;
+  timeseries?: boolean; // 時系列データかどうか
+  interval?: number; // 時系列の場合の間隔（秒）
 }
 
 /**
@@ -46,11 +48,26 @@ export interface HealthDataInput {
 }
 
 /**
+ * 時系列データ入力
+ */
+export interface TimeseriesDataInput {
+  dataType: string;
+  timestamp: Date;
+  value: number;
+  intervalSeconds: number;
+  source?: string;
+  periodDate?: string; // YYYY-MM-DD 形式
+  parentId?: string; // 親レコードのID（例: sleep session ID）
+  metadata?: Record<string, unknown>;
+}
+
+/**
  * データ取得結果
  */
 export interface FetchResult {
   success: boolean;
   data: HealthDataInput[];
+  timeseriesData?: TimeseriesDataInput[];
   errors?: string[];
   nextFetchAt?: Date;
 }
@@ -69,6 +86,7 @@ export interface PluginFetchResult {
   pluginName: string;
   success: boolean;
   data: HealthDataInput[];
+  timeseriesData?: TimeseriesDataInput[];
   errors?: string[];
   fetchedAt: Date;
 }

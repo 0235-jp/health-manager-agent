@@ -31,6 +31,7 @@ export type {
   DataSourceManifest,
   FetchOptions,
   HealthDataInput,
+  TimeseriesDataInput,
   FetchResult,
   PerPluginFetchOptions,
   PluginFetchResult,

@@ -17,6 +17,9 @@ import type {
   DataType,
   ChatMessage,
   ChatStreamEvent,
+  TimeseriesData,
+  TimeseriesAggregateResult,
+  ResampledPoint,
 } from '../types';
 
 const API_BASE = '/api';
@@ -71,6 +74,30 @@ interface HealthDataUpdateParams {
   value?: number;
   unit?: string;
   recorded_at?: string;
+}
+
+interface TimeseriesListParams {
+  data_type?: string;
+  source?: string;
+  start_time?: string;
+  end_time?: string;
+  limit?: number;
+  offset?: number;
+}
+
+interface TimeseriesAggregateParams {
+  data_type: string;
+  start_time?: string;
+  end_time?: string;
+  source?: string;
+}
+
+interface TimeseriesResampleParams {
+  data_type: string;
+  start_time: string;
+  end_time: string;
+  interval_minutes: number;
+  source?: string;
 }
 
 export const api = {
@@ -264,6 +291,24 @@ export const api = {
   dataTypes: {
     list(): Promise<{ data: DataType[] }> {
       return fetchJson('/data-types');
+    },
+  },
+
+  timeseries: {
+    list(params: TimeseriesListParams = {}): Promise<PaginatedResponse<TimeseriesData>> {
+      return fetchJson(`/health-data/timeseries${buildQueryString(params)}`);
+    },
+
+    aggregate(params: TimeseriesAggregateParams): Promise<TimeseriesAggregateResult> {
+      return fetchJson(`/health-data/timeseries/aggregate${buildQueryString(params)}`);
+    },
+
+    resample(params: TimeseriesResampleParams): Promise<ResampledPoint[]> {
+      return fetchJson(`/health-data/timeseries/resample${buildQueryString(params)}`);
+    },
+
+    getDataTypes(): Promise<string[]> {
+      return fetchJson('/health-data/timeseries/data-types');
     },
   },
 

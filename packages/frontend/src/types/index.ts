@@ -139,6 +139,38 @@ export interface DataTypeDefinition {
   category: string;
   unit: string;
   description?: string;
+  timeseries?: boolean;
+  interval?: number;
+}
+
+// Timeseries types
+export interface TimeseriesData {
+  id: number;
+  data_type: string;
+  value: number | null;
+  string_value: string | null;
+  source: string;
+  interval_seconds: number | null;
+  recorded_at: string;
+  period_date: string;
+  parent_id: string | null;
+  created_at: string;
+}
+
+export interface TimeseriesAggregateResult {
+  data_type: string;
+  min: number | null;
+  max: number | null;
+  avg: number | null;
+  count: number;
+}
+
+export interface ResampledPoint {
+  bucket_start: string;
+  avg_value: number | null;
+  min_value: number | null;
+  max_value: number | null;
+  count: number;
 }
 
 export interface Plugin {

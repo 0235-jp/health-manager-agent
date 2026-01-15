@@ -45,7 +45,16 @@ export const DATA_TYPE_CATEGORIES = {
     ],
     フィットネス: ['vo2_max', 'cardiovascular_age'],
     健康検査: ['blood_glucose', 'uric_acid', 'urine_bilirubin', 'urine_glucose'],
-    睡眠: ['sleep_duration', 'deep_sleep', 'light_sleep', 'rem_sleep'],
+    睡眠: [
+      'sleep_duration',
+      'deep_sleep',
+      'light_sleep',
+      'rem_sleep',
+      'sleep_efficiency',
+      'sleep_latency',
+      'time_in_bed',
+      'awake_time',
+    ],
     体温: [
       'body_temperature',
       'skin_temperature',
@@ -63,8 +72,9 @@ export const DATA_TYPE_CATEGORIES = {
       'spo2',
       'ecg',
       'ecg_afib',
+      'respiratory_rate',
     ],
-    活動: ['steps', 'workout_duration', 'workout_calories', 'calories_burned'],
+    活動: ['steps', 'workout_duration', 'workout_calories', 'calories_burned', 'sedentary_time'],
     栄養: [
       'water_intake',
       'calories_intake',
@@ -232,7 +242,10 @@ ${dataAccessInstructions}
     return `## サーバー情報
 SERVER_BASE_URL: ${this.serverBaseUrl}
 
-ヘルスデータを取得するには、get-health-data スキルを使用してください。
+ヘルスデータを取得するには、以下のスキルを使用してください：
+- get-health-data: 日次データの取得（期間指定、最新値、トレンド分析）
+- get-health-data-timeseries: 時系列データの取得（心拍数、HRV、睡眠フェーズなど高頻度データ）
+
 データを取得する際は、必要に応じて日付範囲を指定してください。`;
   }
 
@@ -320,6 +333,17 @@ ${formatDataTypeCategory(DATA_TYPE_CATEGORIES.TREND_BASED)}
 以下のデータは評価期間内のデータを get-health-data で取得して分析してください。
 
 ${formatDataTypeCategory(DATA_TYPE_CATEGORIES.RANGE_BASED)}
+
+### 時系列データ
+以下の高頻度データも利用可能です。詳細な分析が必要な場合は get-health-data-timeseries を使用してください。
+- heart_rate_timeseries: 心拍数（1分間隔）
+- oura:sleep_hr: 睡眠中心拍数（5分間隔）
+- oura:sleep_hrv: 睡眠中HRV（5分間隔）
+- oura:met: MET値（1分間隔）
+- oura:sleep_phase: 睡眠フェーズ（5分間隔、1=deep,2=light,3=rem,4=awake）
+- oura:activity_class: アクティビティクラス（5分間隔、0-5）
+
+時系列データは集計（min/max/avg）やリサンプリングにも対応しています。
 
 ### その他のデータタイプ
 上記以外のデータタイプも存在する場合があります。get-data-types で利用可能なデータタイプ一覧を確認し、分析に有用なものがあれば積極的に活用してください。`;

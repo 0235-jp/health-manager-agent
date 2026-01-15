@@ -117,4 +117,25 @@ export function initializeSchema(): void {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // health_data_timeseries table - 高頻度の時系列データ
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS health_data_timeseries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      data_type TEXT NOT NULL,
+      value REAL,
+      string_value TEXT,
+      source TEXT NOT NULL,
+      interval_seconds INTEGER,
+      recorded_at DATETIME NOT NULL,
+      period_date DATE NOT NULL,
+      parent_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_timeseries_data_type ON health_data_timeseries(data_type);
+    CREATE INDEX IF NOT EXISTS idx_timeseries_recorded_at ON health_data_timeseries(recorded_at);
+    CREATE INDEX IF NOT EXISTS idx_timeseries_period_date ON health_data_timeseries(period_date);
+    CREATE INDEX IF NOT EXISTS idx_timeseries_source ON health_data_timeseries(source);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_timeseries_unique ON health_data_timeseries(data_type, source, recorded_at);
+  `);
 }

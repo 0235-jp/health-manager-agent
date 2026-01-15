@@ -41,10 +41,26 @@ export interface SleepPeriodData {
   rem_sleep_duration: number; // 秒
   light_sleep_duration: number; // 秒
   awake_time: number; // 秒
+  time_in_bed: number; // 秒
   efficiency: number;
   latency: number; // 秒
   average_heart_rate: number | null;
   average_hrv: number | null;
+  average_breath: number | null; // 呼吸数
+  lowest_heart_rate: number | null; // 最低心拍数
+  restless_periods: number; // 不穏睡眠回数
+  // 時系列データ
+  heart_rate?: {
+    interval: number;
+    items: (number | null)[];
+    timestamp: string;
+  };
+  hrv?: {
+    interval: number;
+    items: (number | null)[];
+    timestamp: string;
+  };
+  sleep_phase_5_min?: string; // 5分間隔の睡眠フェーズ（"1234..."形式）
 }
 
 // Daily Activity Response
@@ -62,6 +78,13 @@ export interface DailyActivityData {
   low_activity_time: number; // 秒
   sedentary_time: number; // 秒
   resting_time: number; // 秒
+  // 時系列データ
+  met?: {
+    interval: number;
+    items: (number | null)[];
+    timestamp: string;
+  };
+  class_5_min?: string; // 5分間隔のアクティビティクラス（"01234..."形式）
 }
 
 // Daily Readiness Response
