@@ -1,0 +1,17 @@
+{
+  "name": "@health-manager/fitbit-health-plugin",
+  "version": "1.0.0",
+  "description": "Fitbit Health Data Source Plugin for Health Manager",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:zip": "npm run build && node scripts/create-zip.js",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.7",
+    "adm-zip": "^0.5.16",
+    "typescript": "^5.7.2"
+  }
+}

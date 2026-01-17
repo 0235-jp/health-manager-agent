@@ -1,0 +1,101 @@
+{
+  "name": "fitbit-health-plugin",
+  "displayName": "Fitbit Health",
+  "version": "1.0.0",
+  "type": "data-source",
+  "minHostVersion": "1.1.0",
+  "description": "Fitbit Web APIからヘルスデータを取得",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "supportedDataTypes": [
+    { "name": "steps", "displayName": "歩数", "category": "活動", "unit": "count" },
+    { "name": "calories_burned", "displayName": "消費カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "fitbit:active_calories", "displayName": "アクティブカロリー", "category": "活動", "unit": "kcal" },
+    { "name": "fitbit:bmr_calories", "displayName": "基礎代謝カロリー", "category": "活動", "unit": "kcal" },
+    { "name": "fitbit:distance", "displayName": "移動距離", "category": "活動", "unit": "km" },
+    { "name": "fitbit:floors", "displayName": "登った階数", "category": "活動", "unit": "count" },
+    { "name": "fitbit:elevation", "displayName": "高度上昇", "category": "活動", "unit": "meters" },
+    { "name": "fitbit:very_active_minutes", "displayName": "非常にアクティブな時間", "category": "活動", "unit": "minutes" },
+    { "name": "fitbit:fairly_active_minutes", "displayName": "適度にアクティブな時間", "category": "活動", "unit": "minutes" },
+    { "name": "fitbit:lightly_active_minutes", "displayName": "軽くアクティブな時間", "category": "活動", "unit": "minutes" },
+    { "name": "fitbit:sedentary_minutes", "displayName": "座っている時間", "category": "活動", "unit": "minutes" },
+
+    { "name": "resting_heart_rate", "displayName": "安静時心拍数", "category": "心臓", "unit": "bpm" },
+    { "name": "heart_rate_timeseries", "displayName": "心拍数（時系列）", "category": "心臓", "unit": "bpm", "timeseries": true, "interval": 60, "description": "心拍数の詳細時系列データ（1分間隔）" },
+    { "name": "hrv", "displayName": "心拍変動(HRV)", "category": "心臓", "unit": "ms", "description": "日次RMSSD値" },
+    { "name": "fitbit:deep_hrv", "displayName": "深い睡眠時HRV", "category": "心臓", "unit": "ms" },
+    { "name": "spo2", "displayName": "血中酸素飽和度", "category": "心臓", "unit": "%" },
+
+    { "name": "sleep_duration", "displayName": "睡眠時間", "category": "睡眠", "unit": "hours" },
+    { "name": "deep_sleep", "displayName": "深い睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "light_sleep", "displayName": "浅い睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "rem_sleep", "displayName": "レム睡眠", "category": "睡眠", "unit": "hours" },
+    { "name": "fitbit:awake_time", "displayName": "覚醒時間", "category": "睡眠", "unit": "minutes" },
+    { "name": "fitbit:sleep_latency", "displayName": "入眠潜時", "category": "睡眠", "unit": "minutes" },
+    { "name": "fitbit:time_in_bed", "displayName": "ベッドにいた時間", "category": "睡眠", "unit": "hours" },
+    { "name": "fitbit:sleep_phase", "displayName": "睡眠フェーズ（時系列）", "category": "睡眠", "unit": "phase", "timeseries": true, "interval": 30, "description": "睡眠フェーズの詳細時系列データ（30秒間隔）" },
+
+    { "name": "body_weight", "displayName": "体重", "category": "身体", "unit": "kg" },
+    { "name": "body_fat", "displayName": "体脂肪率", "category": "身体", "unit": "%" },
+    { "name": "fitbit:bmi", "displayName": "BMI", "category": "身体", "unit": "kg/m2" },
+    { "name": "fitbit:lean_mass", "displayName": "除脂肪体重", "category": "身体", "unit": "kg" },
+
+    { "name": "respiratory_rate", "displayName": "呼吸レート", "category": "呼吸器", "unit": "breaths/min" },
+
+    { "name": "skin_temperature", "displayName": "皮膚温度（ベースラインからの差）", "category": "体温", "unit": "degC" },
+
+    { "name": "vo2_max", "displayName": "VO2 Max", "category": "フィットネス", "unit": "ml/kg/min" },
+
+    { "name": "water_intake", "displayName": "水分摂取量", "category": "栄養", "unit": "ml" },
+    { "name": "calories_intake", "displayName": "摂取カロリー", "category": "栄養", "unit": "kcal" },
+    { "name": "nutrition_protein", "displayName": "たんぱく質摂取", "category": "栄養", "unit": "g" },
+    { "name": "nutrition_carbs", "displayName": "炭水化物摂取", "category": "栄養", "unit": "g" },
+    { "name": "nutrition_fat", "displayName": "脂質摂取", "category": "栄養", "unit": "g" },
+    { "name": "fitbit:fiber", "displayName": "食物繊維摂取", "category": "栄養", "unit": "g" },
+    { "name": "fitbit:sodium", "displayName": "ナトリウム摂取", "category": "栄養", "unit": "mg" }
+  ],
+  "fetchStrategy": "both",
+  "defaultFetchInterval": 60,
+  "configSchema": {
+    "clientId": {
+      "type": "string",
+      "label": "Client ID",
+      "description": "Fitbit Developer ConsoleのClient ID",
+      "required": true
+    },
+    "clientSecret": {
+      "type": "string",
+      "label": "Client Secret",
+      "description": "Fitbit Developer ConsoleのClient Secret",
+      "required": true,
+      "secret": true
+    },
+    "accessToken": {
+      "type": "string",
+      "label": "Access Token",
+      "description": "OAuth認証後に取得されるアクセストークン（自動設定）",
+      "required": false,
+      "secret": true
+    },
+    "refreshToken": {
+      "type": "string",
+      "label": "Refresh Token",
+      "description": "トークン更新用のリフレッシュトークン（自動設定）",
+      "required": false,
+      "secret": true
+    },
+    "tokenExpiresAt": {
+      "type": "number",
+      "label": "Token Expiry",
+      "description": "トークン有効期限（Unixタイムスタンプ、自動設定）",
+      "required": false
+    },
+    "codeVerifier": {
+      "type": "string",
+      "label": "Code Verifier",
+      "description": "PKCE認証用の一時的なcode_verifier（自動設定、トークン取得後に削除）",
+      "required": false,
+      "secret": true
+    }
+  }
+}
