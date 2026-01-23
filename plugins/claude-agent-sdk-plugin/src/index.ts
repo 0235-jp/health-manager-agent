@@ -49,6 +49,27 @@ interface ReportContent {
   }>;
   risks: string[];
   recommendations: string[];
+  alerts?: ReportAlert[];
+}
+
+interface ReportAlert {
+  id: string;
+  type: string;
+  message: string;
+  priority: 'high' | 'medium' | 'low';
+  actionRequired: boolean;
+  verificationPrompt?: string;
+}
+
+interface ResponseAction {
+  action: 'done' | 'snooze' | 'cancel' | 'unclear';
+  durationMs?: number;
+  replyMessage?: string;
+}
+
+interface VerificationResult {
+  resolved: boolean;
+  message: string;
 }
 
 interface ChatMessage {
@@ -92,6 +113,8 @@ interface AgentPlugin {
   dispose(): Promise<void>;
   generateReport(params: GenerateReportParams): Promise<ReportContent>;
   chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
+  processUserResponse?(alert: ReportAlert, userMessage: string): Promise<ResponseAction>;
+  verifyAlert?(alert: ReportAlert): Promise<VerificationResult>;
 }
 
 type ToolInput = Record<string, unknown>;
@@ -324,6 +347,113 @@ class ClaudeAgentPlugin implements AgentPlugin {
     }
 
     return { sessionId };
+  }
+
+  /**
+   * ユーザー返信を解析して次のアクションを決定
+   */
+  async processUserResponse(
+    alert: ReportAlert,
+    userMessage: string
+  ): Promise<ResponseAction> {
+    const systemPrompt = `あなたはヘルスアラートへのユーザー返信を解析するアシスタントです。
+ユーザーの返信を分析し、次のアクションを決定してください。
+
+返信パターン:
+- 「対応した」「done」「ok」「完了」→ { "action": "done" }
+- 「1時間後」「後で」「あとで」→ { "action": "snooze", "durationMs": 3600000 }
+- 「30分後」→ { "action": "snooze", "durationMs": 1800000 }
+- 「キャンセル」「cancel」「やめる」→ { "action": "cancel" }
+- その他/不明 → { "action": "unclear", "replyMessage": "確認メッセージ" }
+
+JSON形式で回答してください。`;
+
+    const userPrompt = `アラート: ${alert.message}
+ユーザー返信: ${userMessage}
+
+次のアクションを決定してください。`;
+
+    const q = query({
+      prompt: userPrompt,
+      options: {
+        ...this.getBaseQueryOptions(),
+        systemPrompt,
+        tools: [], // ツール不要
+        persistSession: false,
+      },
+    });
+
+    try {
+      let result = '';
+      for await (const message of q) {
+        if (message.type === 'result' && message.subtype === 'success') {
+          result = message.result || '';
+        }
+      }
+
+      // JSONをパース
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          action: parsed.action || 'unclear',
+          durationMs: parsed.durationMs,
+          replyMessage: parsed.replyMessage,
+        };
+      }
+
+      return { action: 'unclear', replyMessage: '返信内容が理解できませんでした。' };
+    } catch (error) {
+      console.error('[ClaudeAgentPlugin] processUserResponse error:', error);
+      return { action: 'unclear', replyMessage: '処理中にエラーが発生しました。' };
+    }
+  }
+
+  /**
+   * アラートの状態を検証
+   */
+  async verifyAlert(alert: ReportAlert): Promise<VerificationResult> {
+    const systemPrompt = `あなたはヘルスデータを分析してアラートの状態を検証するアシスタントです。
+Skillツールを使用して最新のヘルスデータを取得し、アラートの問題が解決されたかを判定してください。
+
+JSON形式で回答してください:
+{ "resolved": boolean, "message": "ユーザーへのメッセージ" }`;
+
+    const userPrompt = alert.verificationPrompt ||
+      `以下のアラートが解決されたか確認してください:\n${alert.message}\n\nアラートタイプ: ${alert.type}`;
+
+    const q = query({
+      prompt: userPrompt,
+      options: {
+        ...this.getBaseQueryOptions(),
+        systemPrompt,
+        persistSession: false,
+      },
+    });
+
+    try {
+      let result = '';
+      for await (const message of q) {
+        if (message.type === 'result' && message.subtype === 'success') {
+          result = message.result || '';
+        }
+      }
+
+      // JSONをパース
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          resolved: parsed.resolved ?? false,
+          message: parsed.message || '検証が完了しました。',
+        };
+      }
+
+      return { resolved: false, message: '検証結果を判定できませんでした。' };
+    } catch (error) {
+      console.error('[ClaudeAgentPlugin] verifyAlert error:', error);
+      return { resolved: false, message: '検証中にエラーが発生しました。' };
+    }
   }
 }
 

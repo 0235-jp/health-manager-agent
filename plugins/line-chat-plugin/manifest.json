@@ -1,0 +1,40 @@
+{
+  "name": "line-chat-plugin",
+  "displayName": "LINE チャット",
+  "version": "1.0.0",
+  "type": "chat",
+  "minHostVersion": "1.0.0",
+  "description": "LINE Messaging APIを使用した双方向コミュニケーション。アラート通知とユーザー返信に対応。",
+  "author": "Health Manager Agent",
+  "main": "dist/index.js",
+  "supportedEvents": ["report:generated", "report:daily"],
+  "webhookPath": "/line",
+  "configSchema": {
+    "channelAccessToken": {
+      "type": "string",
+      "label": "Channel Access Token",
+      "description": "LINE Messaging API のチャネルアクセストークン",
+      "required": true,
+      "secret": true
+    },
+    "channelSecret": {
+      "type": "string",
+      "label": "Channel Secret",
+      "description": "LINE Messaging API のチャネルシークレット（Webhook署名検証用）",
+      "required": true,
+      "secret": true
+    },
+    "targetUserId": {
+      "type": "string",
+      "label": "Target User ID",
+      "description": "通知を送信するLINEユーザーID",
+      "required": true
+    },
+    "reminderIntervalMinutes": {
+      "type": "number",
+      "label": "リマインダー間隔（分）",
+      "description": "返信がない場合のリマインダー送信間隔",
+      "default": 5
+    }
+  }
+}

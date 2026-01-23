@@ -45,6 +45,24 @@ export interface GenerateReportParams {
 }
 
 /**
+ * レポートアラート - 通知すべき重要な健康情報
+ */
+export interface ReportAlert {
+  /** アラートID（検証時の参照用） */
+  id: string;
+  /** アラートタイプ（'low_steps', 'poor_sleep' など） */
+  type: string;
+  /** ユーザーへのメッセージ */
+  message: string;
+  /** 優先度 */
+  priority: 'high' | 'medium' | 'low';
+  /** アクションが必要か */
+  actionRequired: boolean;
+  /** 検証時にAgentに渡すプロンプト */
+  verificationPrompt?: string;
+}
+
+/**
  * レポート内容
  */
 export interface ReportContent {
@@ -59,6 +77,30 @@ export interface ReportContent {
   >;
   risks: string[];
   recommendations: string[];
+  /** 通知すべきアラート */
+  alerts?: ReportAlert[];
+}
+
+/**
+ * ユーザー返信の解析結果
+ */
+export interface ResponseAction {
+  /** アクションタイプ */
+  action: 'done' | 'snooze' | 'cancel' | 'unclear';
+  /** スヌーズ時間（ミリ秒）- action: 'snooze' 時のみ */
+  durationMs?: number;
+  /** 追加質問メッセージ - action: 'unclear' 時のみ */
+  replyMessage?: string;
+}
+
+/**
+ * アラート検証結果
+ */
+export interface VerificationResult {
+  /** 問題が解決したか */
+  resolved: boolean;
+  /** ユーザーへのメッセージ */
+  message: string;
 }
 
 /**
@@ -116,6 +158,24 @@ export interface AgentPlugin extends BasePlugin {
    * テキストチャンクを yield し、最後に ChatResult を返す
    */
   chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
+
+  /**
+   * ユーザー返信を解析して次のアクションを決定（オプション）
+   * ChatPlugin連携時に使用
+   * @param alert 対象のアラート
+   * @param userMessage ユーザーからの返信メッセージ
+   */
+  processUserResponse?(
+    alert: ReportAlert,
+    userMessage: string
+  ): Promise<ResponseAction>;
+
+  /**
+   * アラートの状態を検証（オプション）
+   * 「対応した」後にデータを再確認
+   * @param alert 検証対象のアラート
+   */
+  verifyAlert?(alert: ReportAlert): Promise<VerificationResult>;
 }
 
 /**

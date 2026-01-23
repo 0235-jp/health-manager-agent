@@ -58,6 +58,27 @@ interface ReportContent {
   >;
   risks: string[];
   recommendations: string[];
+  alerts?: ReportAlert[];
+}
+
+interface ReportAlert {
+  id: string;
+  type: string;
+  message: string;
+  priority: 'high' | 'medium' | 'low';
+  actionRequired: boolean;
+  verificationPrompt?: string;
+}
+
+interface ResponseAction {
+  action: 'done' | 'snooze' | 'cancel' | 'unclear';
+  durationMs?: number;
+  replyMessage?: string;
+}
+
+interface VerificationResult {
+  resolved: boolean;
+  message: string;
 }
 
 interface ChatMessage {
@@ -130,6 +151,8 @@ interface AgentPlugin {
   dispose(): Promise<void>;
   generateReport(params: GenerateReportParams): Promise<ReportContent>;
   chat?(params: ChatParams): AsyncGenerator<string, ChatResult, unknown>;
+  processUserResponse?(alert: ReportAlert, userMessage: string): Promise<ResponseAction>;
+  verifyAlert?(alert: ReportAlert): Promise<VerificationResult>;
 }
 
 // manifest.jsonを読み込み
@@ -381,6 +404,124 @@ class OpenAIChatPlugin implements AgentPlugin {
         recommendations: [],
       };
     }
+  }
+
+  /**
+   * ユーザー返信を解析して次のアクションを決定
+   */
+  async processUserResponse(
+    alert: ReportAlert,
+    userMessage: string
+  ): Promise<ResponseAction> {
+    const { client, toolExecutor } = this.ensureInitialized();
+
+    const systemPrompt = `あなたはヘルスアラートへのユーザー返信を解析するアシスタントです。
+ユーザーの返信を分析し、次のアクションを決定してください。
+
+返信パターン:
+- 「対応した」「done」「ok」「完了」→ { "action": "done" }
+- 「1時間後」「後で」「あとで」→ { "action": "snooze", "durationMs": 3600000 }
+- 「30分後」→ { "action": "snooze", "durationMs": 1800000 }
+- 「キャンセル」「cancel」「やめる」→ { "action": "cancel" }
+- その他/不明 → { "action": "unclear", "replyMessage": "確認メッセージ" }
+
+JSON形式で回答してください。`;
+
+    const userPrompt = `アラート: ${alert.message}
+ユーザー返信: ${userMessage}
+
+次のアクションを決定してください。`;
+
+    const tools = this.convertToolsToOpenAIFormat(toolExecutor.getTools());
+    const messages: ApiChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    try {
+      const response = await client.chatCompletion(messages, []);
+      const content = response.content || '';
+
+      // JSONをパース
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          action: parsed.action || 'unclear',
+          durationMs: parsed.durationMs,
+          replyMessage: parsed.replyMessage,
+        };
+      }
+
+      return { action: 'unclear', replyMessage: '返信内容が理解できませんでした。' };
+    } catch (error) {
+      console.error('[OpenAIChatPlugin] processUserResponse error:', error);
+      return { action: 'unclear', replyMessage: '処理中にエラーが発生しました。' };
+    }
+  }
+
+  /**
+   * アラートの状態を検証
+   */
+  async verifyAlert(alert: ReportAlert): Promise<VerificationResult> {
+    const { client, toolExecutor } = this.ensureInitialized();
+
+    const systemPrompt = `あなたはヘルスデータを分析してアラートの状態を検証するアシスタントです。
+ツールを使用して最新のヘルスデータを取得し、アラートの問題が解決されたかを判定してください。
+
+JSON形式で回答してください:
+{ "resolved": boolean, "message": "ユーザーへのメッセージ" }`;
+
+    const userPrompt = alert.verificationPrompt ||
+      `以下のアラートが解決されたか確認してください:\n${alert.message}\n\nアラートタイプ: ${alert.type}`;
+
+    const tools = this.convertToolsToOpenAIFormat(toolExecutor.getTools());
+    const messages: ApiChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    const maxIterations = 5;
+    for (let i = 0; i < maxIterations; i++) {
+      try {
+        const response = await client.chatCompletion(messages, tools);
+
+        // ツール呼び出しがない場合は結果をパース
+        if (!response.tool_calls || response.tool_calls.length === 0) {
+          const content = response.content || '';
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+              resolved: parsed.resolved ?? false,
+              message: parsed.message || '検証が完了しました。',
+            };
+          }
+          return { resolved: false, message: '検証結果を判定できませんでした。' };
+        }
+
+        // ツール呼び出しを実行
+        messages.push({
+          role: 'assistant',
+          content: response.content,
+          tool_calls: response.tool_calls,
+        });
+
+        for (const toolCall of response.tool_calls) {
+          const result = await this.executeToolCall(toolCall);
+          messages.push({
+            role: 'tool',
+            content: JSON.stringify(result),
+            tool_call_id: toolCall.id,
+          });
+        }
+      } catch (error) {
+        console.error('[OpenAIChatPlugin] verifyAlert error:', error);
+        return { resolved: false, message: '検証中にエラーが発生しました。' };
+      }
+    }
+
+    return { resolved: false, message: '検証がタイムアウトしました。' };
   }
 
   /**

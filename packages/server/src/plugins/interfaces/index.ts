@@ -45,7 +45,10 @@ export type {
   AgentCapabilities,
   AgentManifest,
   GenerateReportParams,
+  ReportAlert,
   ReportContent,
+  ResponseAction,
+  VerificationResult,
   ChatMessage,
   ChatParams,
   ChatResult,
@@ -65,3 +68,19 @@ export type {
   NotificationPlugin,
 } from './notification.js';
 export { isNotificationPlugin } from './notification.js';
+
+// ChatPlugin
+export type {
+  ConversationStatus,
+  ChatManifest,
+  Conversation,
+  MessageDirection,
+  ChatMessageRecord,
+  ChatReminder,
+  StartConversationParams,
+  StartConversationResult,
+  SendMessageResult,
+  HandleUserResponseResult,
+  ChatPlugin,
+} from './chat.js';
+export { isChatPlugin } from './chat.js';

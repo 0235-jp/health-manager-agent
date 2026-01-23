@@ -1,5 +1,6 @@
 import type { ReactElement, FormEvent } from 'react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, schedulerApi } from '../lib/api';
 import { formatDateForInput, getDateDaysAgo, formatDateTime } from '../lib/date-utils';
@@ -53,6 +54,7 @@ interface ConfigFormProps {
 
 function ConfigForm({ plugin, onSave, onCancel, isSaving }: ConfigFormProps): ReactElement {
   const [formData, setFormData] = useState<Record<string, unknown>>(plugin.config || {});
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
 
   function handleChange(key: string, value: unknown): void {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -161,6 +163,40 @@ function ConfigForm({ plugin, onSave, onCancel, isSaving }: ConfigFormProps): Re
             {renderField(key, field)}
           </div>
         ))
+      )}
+      {plugin.type === 'data-source' && plugin.configSchema?.clientId && (
+        <div className="pt-2 border-t border-gray-200">
+          <label className="block text-sm font-medium text-gray-700 mb-1">OAuth認証</label>
+          {plugin.config?.accessToken ? (
+            <p className="text-sm text-green-600">認証済み</p>
+          ) : plugin.config?.clientId && plugin.config?.clientSecret ? (
+            <button
+              type="button"
+              disabled={isAuthorizing}
+              onClick={async () => {
+                setIsAuthorizing(true);
+                try {
+                  const res = await fetch(`/api/plugins/${plugin.name}/oauth/authorize`);
+                  const data = await res.json();
+                  if (data.url) {
+                    window.location.href = data.url;
+                  } else {
+                    alert('認証URLの取得に失敗しました: ' + (data.error || '不明なエラー'));
+                  }
+                } catch (e) {
+                  alert('認証エラー: ' + (e instanceof Error ? e.message : String(e)));
+                } finally {
+                  setIsAuthorizing(false);
+                }
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              {isAuthorizing ? '認証中...' : '認証する'}
+            </button>
+          ) : (
+            <p className="text-xs text-gray-500">Client IDとClient Secretを保存してから認証してください</p>
+          )}
+        </div>
       )}
       <div className="flex gap-2 pt-2">
         <button
@@ -663,11 +699,28 @@ function DataSourcePrioritySection({ plugins }: DataSourcePrioritySectionProps):
 
 export function Plugins(): ReactElement {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [configuringPlugin, setConfiguringPlugin] = useState<Plugin | null>(null);
   const [fetchingPlugin, setFetchingPlugin] = useState<Plugin | null>(null);
   const [dataTypeSelectorPlugin, setDataTypeSelectorPlugin] = useState<Plugin | null>(null);
   const [testResult, setTestResult] = useState<{ name: string; success: boolean; message?: string } | null>(null);
+  const [oauthResult, setOauthResult] = useState<{ success: boolean; plugin: string; message?: string } | null>(null);
+
+  useEffect(() => {
+    const oauth = searchParams.get('oauth');
+    const plugin = searchParams.get('plugin');
+    if (oauth && plugin) {
+      setOauthResult({
+        success: oauth === 'success',
+        plugin,
+        message: searchParams.get('message') || undefined,
+      });
+      setSearchParams({}, { replace: true });
+      queryClient.invalidateQueries({ queryKey: ['plugins'] });
+      setTimeout(() => setOauthResult(null), 8000);
+    }
+  }, [searchParams, setSearchParams, queryClient]);
 
   const { data: plugins = [], isLoading } = useQuery({
     queryKey: ['plugins'],
@@ -774,6 +827,16 @@ export function Plugins(): ReactElement {
           <p className={`text-sm ${testResult.success ? 'text-green-700' : 'text-red-700'}`}>
             {testResult.name}: {testResult.success ? 'テスト成功' : 'テスト失敗'}
             {testResult.message && ` - ${testResult.message}`}
+          </p>
+        </div>
+      )}
+
+      {oauthResult && (
+        <div className={`p-4 rounded-md border ${oauthResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+          <p className={`text-sm ${oauthResult.success ? 'text-green-700' : 'text-red-700'}`}>
+            {oauthResult.success
+              ? `${oauthResult.plugin}: OAuth認証に成功しました`
+              : `${oauthResult.plugin}: OAuth認証に失敗しました${oauthResult.message ? ` - ${oauthResult.message}` : ''}`}
           </p>
         </div>
       )}

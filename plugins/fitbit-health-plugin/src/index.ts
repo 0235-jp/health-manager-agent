@@ -71,6 +71,7 @@ interface ConnectionTestResult {
 
 interface PluginContext {
   config: Record<string, unknown>;
+  saveConfig?: (config: Record<string, unknown>) => void;
   toolExecutor?: unknown;
   promptBuilder?: unknown;
   useSkills?: boolean;
@@ -98,6 +99,7 @@ class FitbitHealthPlugin implements DataSourcePlugin {
 
   private client: FitbitApiClient | null = null;
   private config: Record<string, unknown> = {};
+  private saveConfig?: (config: Record<string, unknown>) => void;
 
   constructor(manifest: DataSourceManifest) {
     this.manifest = manifest;
@@ -106,6 +108,7 @@ class FitbitHealthPlugin implements DataSourcePlugin {
   async initialize(context: PluginContext): Promise<void> {
     const { config } = context;
     this.config = config;
+    this.saveConfig = context.saveConfig;
 
     const clientId = config.clientId as string | undefined;
     const clientSecret = config.clientSecret as string | undefined;
@@ -128,13 +131,19 @@ class FitbitHealthPlugin implements DataSourcePlugin {
         this.client.setCodeVerifier(codeVerifier);
       }
 
-      // Set token refresh callback to update config
+      // Set token refresh callback to update config and persist to DB
       this.client.setTokenRefreshCallback((tokenInfo: TokenInfo) => {
         this.config.accessToken = tokenInfo.accessToken;
         this.config.refreshToken = tokenInfo.refreshToken;
         this.config.tokenExpiresAt = tokenInfo.expiresAt;
-        // Clear code verifier after successful token exchange
         delete this.config.codeVerifier;
+
+        // Persist updated tokens to DB
+        this.saveConfig?.({
+          accessToken: tokenInfo.accessToken,
+          refreshToken: tokenInfo.refreshToken,
+          tokenExpiresAt: tokenInfo.expiresAt,
+        });
       });
 
       console.log('[FitbitHealthPlugin] Initialized with client credentials');
@@ -157,8 +166,9 @@ class FitbitHealthPlugin implements DataSourcePlugin {
 
     const { url, codeVerifier } = this.client.getAuthorizationUrl(redirectUri, state);
 
-    // Store code verifier in config for later retrieval
+    // Store code verifier in config and persist to DB
     this.config.codeVerifier = codeVerifier;
+    this.saveConfig?.({ codeVerifier });
 
     return url;
   }

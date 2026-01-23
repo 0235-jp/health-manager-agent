@@ -18,6 +18,7 @@ import { pluginsRepository } from '../db/repositories/plugins.js';
 import type { NotificationEvent } from '../plugins/interfaces/notification.js';
 import type { PerPluginFetchOptions, PluginFetchResult } from '../plugins/interfaces/index.js';
 import { logApiResponse } from '../utils/debug-logger.js';
+import { getChatScheduler } from './chat-scheduler.js';
 
 export interface BackfillResult {
   totalFetched: number;
@@ -198,6 +199,9 @@ export class Scheduler {
     );
 
     console.log(`[Scheduler] Daily report job scheduled at 00:05 (timezone: ${timezone})`);
+
+    // ChatSchedulerを開始
+    getChatScheduler().start();
   }
 
   /**
@@ -630,6 +634,9 @@ export class Scheduler {
       this.dailyReportJob.stop();
       this.dailyReportJob = null;
     }
+
+    // ChatSchedulerを停止
+    getChatScheduler().stop();
 
     console.log('[Scheduler] Stopped');
   }

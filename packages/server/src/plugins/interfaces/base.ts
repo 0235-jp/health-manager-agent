@@ -4,7 +4,7 @@
 
 import type { ToolExecutor, PromptBuilder } from '../tools/index.js';
 
-export type PluginType = 'data-source' | 'agent' | 'notification';
+export type PluginType = 'data-source' | 'agent' | 'notification' | 'chat';
 
 /**
  * 設定フィールドの定義
@@ -56,6 +56,8 @@ export interface ValidationResult {
 export interface PluginContext {
   /** ユーザー設定 */
   config: Record<string, unknown>;
+  /** 設定をDBに永続化するコールバック */
+  saveConfig?: (config: Record<string, unknown>) => void;
   /** ツール実行器（agentプラグインのみ） */
   toolExecutor?: ToolExecutor;
   /** プロンプトビルダー（agentプラグインのみ） */

@@ -185,7 +185,12 @@ export const pluginsRepository = {
       .prepare("SELECT value FROM settings WHERE key = 'current_agent'")
       .get() as { value: string } | undefined;
 
-    return row ? row.value : null;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.value) as string;
+    } catch {
+      return row.value;
+    }
   },
 
   /**
@@ -196,7 +201,7 @@ export const pluginsRepository = {
     db.prepare(`
       INSERT OR REPLACE INTO settings (key, value, updated_at)
       VALUES ('current_agent', ?, ?)
-    `).run(name, nowUTC());
+    `).run(JSON.stringify(name), nowUTC());
   },
 
   /**

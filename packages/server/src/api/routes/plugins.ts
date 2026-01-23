@@ -4,10 +4,12 @@
  * プラグインの管理・設定・テスト用エンドポイント
  */
 
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
 import multer from 'multer';
+import { config as appConfig } from '../../config/index.js';
 import { PluginManager } from '../../plugins/manager.js';
 import { pluginsRepository } from '../../db/repositories/plugins.js';
 import type { PluginManifest, PluginType } from '../../plugins/interfaces/base.js';
@@ -521,5 +523,96 @@ pluginsRouter.post('/:name/load', async (req, res) => {
       error: 'Plugin load failed',
       message: error instanceof Error ? error.message : String(error),
     });
+  }
+});
+
+/**
+ * OAuth認証URL取得
+ * GET /api/plugins/:name/oauth/authorize
+ */
+pluginsRouter.get('/:name/oauth/authorize', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const pluginManager = PluginManager.getInstance();
+    const state = pluginManager.getPlugin(name);
+
+    if (!state) {
+      res.status(404).json({ error: 'Plugin not found' });
+      return;
+    }
+
+    if (state.plugin.manifest.type !== 'data-source') {
+      res.status(400).json({ error: 'Plugin is not a data-source plugin' });
+      return;
+    }
+
+    const dsPlugin = state.plugin as DataSourcePlugin;
+    if (!dsPlugin.getAuthorizationUrl) {
+      res.status(400).json({ error: 'Plugin does not support OAuth' });
+      return;
+    }
+
+    const redirectUri = `${appConfig.serverBaseUrl}/api/plugins/${name}/oauth/callback`;
+    const oauthState = crypto.randomBytes(16).toString('hex');
+    const authUrl = dsPlugin.getAuthorizationUrl(redirectUri, oauthState);
+
+    // code_verifier を設定に永続化（PKCE用）
+    const pluginConfig = state.config;
+    if (pluginConfig.codeVerifier) {
+      pluginsRepository.updateConfig(name, pluginConfig);
+    }
+
+    res.json({ url: authUrl });
+  } catch (error) {
+    console.error('[PluginsAPI] OAuth authorize failed:', error);
+    res.status(500).json({
+      error: 'OAuth authorization failed',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * OAuthコールバック処理
+ * GET /api/plugins/:name/oauth/callback
+ */
+pluginsRouter.get('/:name/oauth/callback', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { code } = req.query;
+
+    if (!code || typeof code !== 'string') {
+      res.status(400).json({ error: 'Missing authorization code' });
+      return;
+    }
+
+    const pluginManager = PluginManager.getInstance();
+    const state = pluginManager.getPlugin(name);
+
+    if (!state) {
+      res.status(404).json({ error: 'Plugin not found' });
+      return;
+    }
+
+    const dsPlugin = state.plugin as DataSourcePlugin;
+    if (!dsPlugin.handleOAuthCallback) {
+      res.status(400).json({ error: 'Plugin does not support OAuth' });
+      return;
+    }
+
+    const redirectUri = `${appConfig.serverBaseUrl}/api/plugins/${name}/oauth/callback`;
+    await dsPlugin.handleOAuthCallback(code, redirectUri);
+
+    // トークンはプラグイン内のコールバックでsaveConfig経由でDBに保存済み
+    // フロントエンドにリダイレクト
+    const frontendUrl = appConfig.corsOrigin || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/plugins?oauth=success&plugin=${name}`);
+  } catch (error) {
+    console.error('[PluginsAPI] OAuth callback failed:', error);
+    const frontendUrl = appConfig.corsOrigin || 'http://localhost:5173';
+    const errorMsg = encodeURIComponent(
+      error instanceof Error ? error.message : String(error)
+    );
+    res.redirect(`${frontendUrl}/plugins?oauth=error&plugin=${req.params.name}&message=${errorMsg}`);
   }
 });

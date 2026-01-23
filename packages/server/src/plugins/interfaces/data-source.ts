@@ -118,14 +118,17 @@ export interface DataSourcePlugin extends BasePlugin {
 
   /**
    * OAuth認証URL取得（OAuth対応プラグイン用）
+   * @param redirectUri リダイレクトURI
+   * @param state CSRF防止用のstate値
    */
-  getAuthorizationUrl?(): Promise<string>;
+  getAuthorizationUrl?(redirectUri: string, state: string): string;
 
   /**
    * OAuthコールバック処理
    * @param code 認証コード
+   * @param redirectUri リダイレクトURI
    */
-  handleOAuthCallback?(code: string): Promise<void>;
+  handleOAuthCallback?(code: string, redirectUri: string): Promise<unknown>;
 }
 
 /**

@@ -225,6 +225,7 @@ export class PluginLoader {
         'data-source',
         'agent',
         'notification',
+        'chat',
       ];
       if (!validTypes.includes(manifest.type)) {
         errors.push(`type must be one of: ${validTypes.join(', ')}`);

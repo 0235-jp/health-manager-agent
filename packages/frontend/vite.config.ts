@@ -10,13 +10,17 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: parseInt(process.env.VITE_PORT || '5173', 10),
     host: true,  // 0.0.0.0 でバインド（外部からアクセス可能）
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_API_TARGET || 'http://localhost:3001',
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    port: parseInt(process.env.VITE_PREVIEW_PORT || '4173', 10),
+    host: true,
   },
 });

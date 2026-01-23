@@ -9,6 +9,8 @@ import { EventBus } from './event-bus.js';
 import type {
   AgentManifest,
   AgentPlugin,
+  ChatManifest,
+  ChatPlugin,
   FetchOptions,
   GenerateReportParams,
   HealthDataInput,
@@ -235,6 +237,11 @@ export class PluginManager {
       this.registerNotificationPlugin(instance as NotificationPlugin);
     }
 
+    // ChatプラグインもEventBusに登録
+    if (manifest.type === 'chat') {
+      this.registerChatPlugin(instance as ChatPlugin);
+    }
+
     // Agentプラグインで現在のエージェントが未設定なら設定
     if (manifest.type === 'agent' && !this.currentAgentName) {
       this.currentAgentName = manifest.name;
@@ -252,12 +259,27 @@ export class PluginManager {
   ): PluginContext {
     const context: PluginContext = { config };
 
+    // 設定永続化コールバック
+    context.saveConfig = (newConfig: Record<string, unknown>) => {
+      const state = this.registry.get(manifest.name);
+      if (state) {
+        this.registry.updateConfig(manifest.name, newConfig);
+        this.pluginConfigStore.set(manifest.name, state.config);
+        pluginsRepository.updateConfig(manifest.name, state.config);
+      }
+    };
+
     // Agentプラグインの場合、ToolExecutorとPromptBuilderを提供
     if (manifest.type === 'agent') {
       const agentManifest = manifest as AgentManifest;
       context.toolExecutor = this.toolExecutor;
       context.promptBuilder = this.promptBuilder;
       context.useSkills = agentManifest.capabilities?.skills ?? false;
+    }
+
+    // ChatプラグインにもToolExecutorを提供（データ検証用）
+    if (manifest.type === 'chat') {
+      context.toolExecutor = this.toolExecutor;
     }
 
     return context;
@@ -304,6 +326,58 @@ export class PluginManager {
           `[PluginManager] Notification plugin ${pluginName} failed:`,
           error
         );
+      }
+    });
+
+    // unsubscribe関数を保存
+    this.pluginUnsubscribers.set(pluginName, unsubscribe);
+  }
+
+  /**
+   * ChatプラグインをEventBusに登録
+   */
+  private registerChatPlugin(plugin: ChatPlugin): void {
+    const supportedEvents = plugin.manifest.supportedEvents;
+    const pluginName = plugin.manifest.name;
+
+    // 既存の購読があれば解除
+    const existingUnsubscribe = this.pluginUnsubscribers.get(pluginName);
+    if (existingUnsubscribe) {
+      existingUnsubscribe();
+    }
+
+    const unsubscribe = this.eventBus.subscribeMany(supportedEvents, async (event) => {
+      const state = this.registry.get(pluginName);
+      if (!state?.isActive) return;
+
+      // ChatPluginはreport:generatedイベントのアラートを処理
+      if (event.type === 'report:generated' || event.type === 'report:daily') {
+        const payload = event.payload as import('./interfaces/notification.js').ReportGeneratedPayload;
+        const alerts = payload.content.alerts;
+
+        if (alerts && alerts.length > 0) {
+          for (const alert of alerts) {
+            try {
+              // ChatPluginの設定からターゲットユーザーIDを取得
+              const targetUserId = state.config.targetUserId as string;
+              if (!targetUserId) {
+                console.warn(`[PluginManager] ChatPlugin ${pluginName} has no targetUserId configured`);
+                continue;
+              }
+
+              await plugin.startConversation({
+                externalUserId: targetUserId,
+                eventType: event.type,
+                alert,
+              });
+            } catch (error) {
+              console.error(
+                `[PluginManager] ChatPlugin ${pluginName} failed to start conversation:`,
+                error
+              );
+            }
+          }
+        }
       }
     });
 

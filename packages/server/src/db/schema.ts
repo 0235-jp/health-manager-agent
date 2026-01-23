@@ -138,4 +138,52 @@ export function initializeSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_timeseries_source ON health_data_timeseries(source);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_timeseries_unique ON health_data_timeseries(data_type, source, recorded_at);
   `);
+
+  // chat_conversations table - 会話状態管理
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_conversations (
+      id TEXT PRIMARY KEY,
+      plugin_name TEXT NOT NULL,
+      external_user_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      event_type TEXT NOT NULL,
+      original_payload TEXT NOT NULL,
+      verification_condition TEXT,
+      snooze_until DATETIME,
+      reminder_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_conversations_plugin ON chat_conversations(plugin_name);
+    CREATE INDEX IF NOT EXISTS idx_chat_conversations_status ON chat_conversations(status);
+    CREATE INDEX IF NOT EXISTS idx_chat_conversations_user ON chat_conversations(external_user_id);
+  `);
+
+  // chat_messages table - メッセージ履歴
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      content TEXT NOT NULL,
+      external_message_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id);
+  `);
+
+  // chat_reminders table - 再通知スケジュール
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL UNIQUE,
+      scheduled_at DATETIME NOT NULL,
+      processed INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_reminders_scheduled ON chat_reminders(scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_chat_reminders_processed ON chat_reminders(processed);
+  `);
 }

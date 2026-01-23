@@ -9,6 +9,7 @@ import type {
   DataSourcePlugin,
   AgentPlugin,
   NotificationPlugin,
+  ChatPlugin,
 } from './interfaces/index.js';
 
 /**
@@ -122,6 +123,13 @@ export class PluginRegistry {
    */
   getNotificationPlugins(): NotificationPlugin[] {
     return this.getActiveByType<NotificationPlugin>('notification');
+  }
+
+  /**
+   * Chatプラグインを取得
+   */
+  getChatPlugins(): ChatPlugin[] {
+    return this.getActiveByType<ChatPlugin>('chat');
   }
 
   /**

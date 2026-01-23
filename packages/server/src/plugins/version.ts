@@ -11,7 +11,7 @@ import semver from 'semver';
  * - MINOR: 後方互換性のある機能追加
  * - PATCH: バグ修正
  */
-export const PLUGIN_API_VERSION = '1.1.0';
+export const PLUGIN_API_VERSION = '1.2.0';
 
 /**
  * セマンティックバージョン形式の検証

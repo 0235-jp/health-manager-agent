@@ -9,6 +9,8 @@ import { reportsRouter } from './reports.js';
 import { pluginsRouter } from './plugins.js';
 import { schedulerRouter } from './scheduler.js';
 import { chatRouter } from './chat.js';
+import { webhooksRouter } from './webhooks.js';
+import { chatConversationsRouter } from './chat-conversations.js';
 
 export const router = Router();
 
@@ -22,3 +24,5 @@ router.use('/reports', reportsRouter);
 router.use('/plugins', pluginsRouter);
 router.use('/scheduler', schedulerRouter);
 router.use('/chat', chatRouter);
+router.use('/webhooks', webhooksRouter);
+router.use('/chat/conversations', chatConversationsRouter);
