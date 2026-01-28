@@ -550,10 +550,14 @@ export class Scheduler {
     const periodStart = new Date(periodEnd);
     periodStart.setDate(periodStart.getDate() - 1);
 
+    // backfillは1週間分（同期遅延によるデータ取りこぼし防止）
+    const backfillStart = new Date(periodEnd);
+    backfillStart.setDate(backfillStart.getDate() - 7);
+
     try {
-      // 1. データ補完: 1日分のデータを全プラグインから再取得
-      const backfillResult = await this.runDataBackfill(periodStart, periodEnd);
-      console.log(`[Scheduler] Daily backfill: ${backfillResult.inserted} new records`);
+      // 1. データ補完: 1週間分のデータを全プラグインから再取得
+      const backfillResult = await this.runDataBackfill(backfillStart, periodEnd);
+      console.log(`[Scheduler] Weekly backfill: ${backfillResult.inserted} new records`);
 
       // 2. 日次レポート生成
       const content = await pluginManager.generateReport({
