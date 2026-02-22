@@ -44,6 +44,18 @@ pnpm build
 
 プラグインごとに必要な環境変数が異なります。各プラグインの設定画面から API キーなどを設定してください。
 
+#### 認証（任意）
+
+公開環境で利用する場合、`/mcp` と `/api` エンドポイントに認証を設定できます。どちらも未設定の場合は認証なし（ローカル開発モード）で動作します。
+
+| 変数 | 説明 |
+|------|------|
+| `HEALTH_MANAGER_BEARER_TOKEN` | Bearer トークン認証用。設定すると `/mcp` と `/api` に認証が必要になる |
+| `CF_ACCESS_CLIENT_ID` | Cloudflare Access Service Token の Client ID |
+| `CF_ACCESS_CLIENT_SECRET` | Cloudflare Access Service Token の Client Secret |
+
+詳細は `.env.example` を参照してください。
+
 ### 起動
 
 ```bash
