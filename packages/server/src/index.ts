@@ -4,6 +4,7 @@ import { initializeSchema } from './db/schema.js';
 import { seedInitialData } from './db/seed.js';
 import { PluginManager } from './plugins/manager.js';
 import { getScheduler } from './scheduler/index.js';
+import { closeMcpSessions } from './mcp/index.js';
 import path from 'path';
 
 async function main(): Promise<void> {
@@ -33,6 +34,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`\n${signal} received. Starting graceful shutdown...`);
 
+    await closeMcpSessions();
     await scheduler.stop();
     await pluginManager.dispose();
 

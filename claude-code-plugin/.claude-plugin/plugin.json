@@ -1,0 +1,14 @@
+{
+  "name": "health-manager-mcp",
+  "description": "Health Manager MCP 接続プラグイン",
+  "version": "1.0.0",
+  "mcpServers": {
+    "health-manager": {
+      "type": "http",
+      "url": "${HEALTH_MANAGER_URL:-http://localhost:3001}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${HEALTH_MANAGER_BEARER_TOKEN}"
+      }
+    }
+  }
+}
