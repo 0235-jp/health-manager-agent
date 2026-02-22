@@ -1,7 +1,7 @@
 {
   "name": "health-manager-mcp",
   "description": "Health Manager MCP 接続プラグイン",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "mcpServers": {
     "health-manager": {
       "type": "http",
