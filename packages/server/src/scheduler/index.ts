@@ -339,6 +339,11 @@ export class Scheduler {
     // 7. 取得時レポート生成（Agentプラグインがある場合のみ）
     const currentAgent = pluginManager.getCurrentAgent();
     if (currentAgent) {
+      // on_fetch レポート有効/無効チェック
+      const onFetchReportEnabled = settingsRepository.get('on_fetch_report_enabled');
+      if (onFetchReportEnabled === false) {
+        console.log('[Scheduler] Skipping on-fetch report generation (disabled by setting)');
+      } else {
       // 除外時間帯チェック
       const excludedPeriods = (settingsRepository.get('report_excluded_periods') as ExcludedPeriod[]) || [];
       const timezone = (settingsRepository.get('timezone') as string) || Scheduler.DEFAULT_TIMEZONE;
@@ -382,6 +387,7 @@ export class Scheduler {
         } catch (error) {
           console.error('[Scheduler] Failed to generate on-fetch report:', error);
         }
+      }
       }
     }
 

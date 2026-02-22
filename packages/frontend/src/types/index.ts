@@ -49,6 +49,8 @@ export interface Settings {
   data_source_priority: Record<string, string>;
   report_excluded_periods: ExcludedPeriod[];
   user_profile?: UserProfile;
+  /** データ収集時の自動レポート生成 */
+  on_fetch_report_enabled?: boolean;
   /** API取得データをファイルに保存 */
   debug_api_responses?: boolean;
   /** チャットデータをファイルに保存 */

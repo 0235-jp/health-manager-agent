@@ -87,6 +87,7 @@ export function seedInitialData(): void {
     { key: 'data_source_priority', value: JSON.stringify({}) },
     { key: 'webhook_url', value: JSON.stringify('') },
     { key: 'report_excluded_periods', value: JSON.stringify([]) },
+    { key: 'on_fetch_report_enabled', value: JSON.stringify(true) },
   ];
 
   const insertSetting = db.prepare(`

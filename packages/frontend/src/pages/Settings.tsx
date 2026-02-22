@@ -317,6 +317,45 @@ function ExcludedPeriodItem({
   );
 }
 
+function OnFetchReportToggle(): ReactElement {
+  const queryClient = useQueryClient();
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: api.settings.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+
+  const enabled = settings?.on_fetch_report_enabled ?? true;
+
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <input
+        type="checkbox"
+        id="on_fetch_report_enabled"
+        checked={enabled}
+        onChange={(e) => updateMutation.mutate({ on_fetch_report_enabled: e.target.checked })}
+        disabled={updateMutation.isPending}
+        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+      <div>
+        <label htmlFor="on_fetch_report_enabled" className="text-sm font-medium text-gray-700">
+          データ収集時に自動レポートを生成する
+        </label>
+        <p className="text-xs text-gray-500">
+          無効にすると、定期データ収集時のレポート生成をスキップします。日次レポートには影響しません。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ReportExcludedPeriodsSection(): ReactElement {
   const queryClient = useQueryClient();
 
@@ -969,6 +1008,7 @@ export function Settings(): ReactElement {
         <h3 className="mb-2 text-lg font-medium text-gray-800">
           レポート生成除外時間帯
         </h3>
+        <OnFetchReportToggle />
         <p className="mb-4 text-sm text-gray-600">
           指定した時間帯はデータ収集時の自動レポート生成をスキップします。日次レポートには影響しません。
         </p>
