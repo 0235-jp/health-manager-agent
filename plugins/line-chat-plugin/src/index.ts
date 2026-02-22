@@ -91,6 +91,17 @@ interface ConversationState {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.resolve(__dirname, '..', 'manifest.json');
 
+// タグパターン
+const CHAT_TAG_PATTERN = /^\/chat\s*/i;
+const RESET_TAG_PATTERN = /^\/reset\s*$/i;
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30分
+
+// メモリ内チャットセッション管理
+interface ExternalChatSession {
+  agentSessionId: string | null;
+  lastActivityAt: number;
+}
+
 /**
  * LINE Chat Plugin 実装
  */
@@ -103,6 +114,9 @@ class LineChatPlugin implements ChatPlugin {
 
   // In-memory conversation state (production would use repository)
   private conversations: Map<string, ConversationState> = new Map();
+
+  // メモリ内チャットセッション管理 (key: externalUserId)
+  private chatSessions: Map<string, ExternalChatSession> = new Map();
 
   // Callback to server-side repositories and agent
   private serverCallbacks: {
@@ -125,6 +139,12 @@ class LineChatPlugin implements ChatPlugin {
       processUserResponse?: (alert: ReportAlert, message: string) => Promise<{ action: string; durationMs?: number; replyMessage?: string }>;
       verifyAlert?: (alert: ReportAlert) => Promise<{ resolved: boolean; message: string }>;
     } | null;
+    // AIチャット用コールバック
+    chat?: (
+      agentSessionId: string | null,
+      message: string,
+      onChunk: (text: string) => void
+    ) => Promise<{ newSessionId: string }>;
   } = {};
 
   constructor(manifest: ChatManifest) {
@@ -529,13 +549,34 @@ class LineChatPlugin implements ChatPlugin {
 
     console.log(`[LineChatPlugin] Received message from ${userId}: ${messageText}`);
 
-    // このユーザーのアクティブな会話を検索
+    // タグ解析
+    const { tag, content } = this.parseMessageTag(messageText);
+
+    if (tag === 'reset') {
+      // /reset タグ: セッションリセット
+      this.resetChatSession(userId);
+      if (replyToken && this.lineClient) {
+        await this.lineClient.replyMessage(replyToken, '🔄 会話をリセットしました。');
+      }
+      return;
+    }
+
+    if (tag === 'chat') {
+      // /chat タグ: AIチャットモード
+      await this.delegateToChatSession(userId, content, replyToken);
+      return;
+    }
+
+    // タグなし: 既存のアラート返信処理
     const conversation = this.findActiveConversationForUser(userId);
 
     if (!conversation) {
       // アクティブな会話がない場合
       if (replyToken && this.lineClient) {
-        await this.lineClient.replyMessage(replyToken, '現在対応中の通知はありません。');
+        await this.lineClient.replyMessage(
+          replyToken,
+          '現在対応中の通知はありません。\n\nAIに相談する場合は「/chat 質問内容」の形式でメッセージを送信してください。'
+        );
       }
       return;
     }
@@ -587,6 +628,102 @@ class LineChatPlugin implements ChatPlugin {
     }
 
     return undefined;
+  }
+
+  // ========== AIチャット機能 ==========
+
+  /**
+   * メッセージタグを解析
+   */
+  private parseMessageTag(text: string): { tag: 'chat' | 'reset' | null; content: string } {
+    if (RESET_TAG_PATTERN.test(text)) {
+      return { tag: 'reset', content: '' };
+    }
+    const match = text.match(CHAT_TAG_PATTERN);
+    if (match) {
+      return { tag: 'chat', content: text.slice(match[0].length).trim() };
+    }
+    return { tag: null, content: text };
+  }
+
+  /**
+   * チャットセッションを取得または作成
+   * タイムアウト検出付き
+   */
+  private getOrCreateChatSession(userId: string): { session: ExternalChatSession; wasExpired: boolean } {
+    const existing = this.chatSessions.get(userId);
+    const now = Date.now();
+
+    // タイムアウトチェック
+    if (existing && now - existing.lastActivityAt < SESSION_TIMEOUT_MS) {
+      existing.lastActivityAt = now;
+      return { session: existing, wasExpired: false };
+    }
+
+    // 新規セッション（タイムアウトまたは初回）
+    const session: ExternalChatSession = { agentSessionId: null, lastActivityAt: now };
+    this.chatSessions.set(userId, session);
+    return { session, wasExpired: existing !== undefined }; // 既存セッションがあった場合はタイムアウト
+  }
+
+  /**
+   * チャットセッションをリセット
+   */
+  private resetChatSession(userId: string): void {
+    this.chatSessions.delete(userId);
+  }
+
+  /**
+   * AIチャットセッションにメッセージを委譲
+   */
+  private async delegateToChatSession(
+    userId: string,
+    message: string,
+    replyToken?: string
+  ): Promise<void> {
+    const { session, wasExpired } = this.getOrCreateChatSession(userId);
+
+    // chatコールバックを動的に取得（registerChatPlugin後に設定されるため）
+    const callbacks = (globalThis as Record<string, unknown>).__lineChatPluginCallbacks as typeof this.serverCallbacks | undefined;
+    const chatCallback = callbacks?.chat;
+
+    if (!chatCallback) {
+      if (replyToken && this.lineClient) {
+        await this.lineClient.replyMessage(replyToken, 'チャット機能は現在利用できません。');
+      }
+      return;
+    }
+
+    // タイムアウトで新規セッションになった場合は通知
+    let prefixMessage = '';
+    if (wasExpired) {
+      prefixMessage = '⏰ 前回の会話から30分以上経過したため、新しい会話を開始します。\n\n';
+    }
+
+    try {
+      // AgentPlugin.chat() を呼び出し（ストリーミング結果を収集）
+      let fullResponse = '';
+      const result = await chatCallback(
+        session.agentSessionId,
+        message,
+        (chunk) => { fullResponse += chunk; }
+      );
+
+      // セッション更新（AIレスポンス完了時）
+      session.agentSessionId = result.newSessionId;
+      session.lastActivityAt = Date.now();
+
+      // 返信
+      if (replyToken && this.lineClient && fullResponse) {
+        await this.lineClient.replyMessage(replyToken, prefixMessage + fullResponse);
+      }
+    } catch (error) {
+      console.error('[LineChatPlugin] Chat delegation error:', error);
+      if (replyToken && this.lineClient) {
+        const errorMessage = error instanceof Error ? error.message : 'チャット処理中にエラーが発生しました';
+        await this.lineClient.replyMessage(replyToken, `エラー: ${errorMessage}`);
+      }
+    }
   }
 
   /**

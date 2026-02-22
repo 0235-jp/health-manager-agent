@@ -173,6 +173,23 @@ export function initializeSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id);
   `);
 
+  // health_images table - 健康診断画像
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS health_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      memo TEXT,
+      file_path TEXT NOT NULL,
+      original_filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      recorded_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_images_recorded_at ON health_images(recorded_at);
+  `);
+
   // chat_reminders table - 再通知スケジュール
   db.exec(`
     CREATE TABLE IF NOT EXISTS chat_reminders (

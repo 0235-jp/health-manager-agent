@@ -237,6 +237,40 @@ export interface DataType {
   plugin_name: string | null;
 }
 
+// Health Image types
+export interface HealthImage {
+  id: number;
+  title: string;
+  memo: string | null;
+  file_path: string;
+  original_filename: string;
+  mime_type: string;
+  file_size: number;
+  recorded_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HealthImageUploadParams {
+  title: string;
+  memo?: string;
+  recorded_at: string;
+  files: File[];
+}
+
+export interface HealthImageUpdateParams {
+  title?: string;
+  memo?: string;
+  recorded_at?: string;
+}
+
+export interface HealthImageListParams {
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // Chat types
 export interface ChatMessage {
   id: string;

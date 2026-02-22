@@ -26,8 +26,12 @@ import type {
 } from './interfaces/index.js';
 import { pluginsRepository, type PluginRecord } from '../db/repositories/plugins.js';
 import { customInstructionsRepository } from '../db/repositories/custom-instructions.js';
+import { chatConversationsRepository } from '../db/repositories/chat-conversations.js';
+import { chatMessagesRepository } from '../db/repositories/chat-messages.js';
 import { DefaultToolExecutor, DefaultPromptBuilder } from './tools/index.js';
 import type { ToolExecutor, PromptBuilder } from './tools/index.js';
+import type { Conversation, ConversationStatus, MessageDirection } from './interfaces/chat.js';
+import type { NotificationEventType } from './interfaces/notification.js';
 
 /**
  * プラグインマネージャー
@@ -222,6 +226,12 @@ export class PluginManager {
     // PluginContextを構築
     const context = this.buildPluginContext(manifest, savedConfig);
 
+    // Chatプラグインの場合、initialize()前にコールバックを設定
+    // （LineChatPlugin.setupServerCallbacks()がglobalThisから読み取るため）
+    if (manifest.type === 'chat') {
+      this.setupChatCallbacks();
+    }
+
     // プラグインを初期化
     try {
       await instance.initialize(context);
@@ -383,6 +393,134 @@ export class PluginManager {
 
     // unsubscribe関数を保存
     this.pluginUnsubscribers.set(pluginName, unsubscribe);
+  }
+
+  /**
+   * Chatプラグイン用のサーバーサイドコールバックを設定
+   * initialize()前に呼び出し、globalThis経由でChatPluginに提供
+   */
+  private setupChatCallbacks(): void {
+    if (!(globalThis as Record<string, unknown>).__lineChatPluginCallbacks) {
+      (globalThis as Record<string, unknown>).__lineChatPluginCallbacks = {};
+    }
+
+    const serverCallbacks = (globalThis as Record<string, unknown>).__lineChatPluginCallbacks as Record<string, unknown>;
+
+    // 会話管理コールバック
+    serverCallbacks.createConversation = (data: {
+      id: string;
+      pluginName: string;
+      externalUserId: string;
+      eventType: string;
+      originalPayload: unknown;
+      verificationCondition?: string;
+    }) => {
+      return chatConversationsRepository.create(
+        data as { id: string; pluginName: string; externalUserId: string; eventType: NotificationEventType; originalPayload: import('./interfaces/agent.js').ReportAlert; verificationCondition?: string }
+      );
+    };
+
+    serverCallbacks.findConversation = (id: string) => {
+      const conv = chatConversationsRepository.findById(id);
+      return conv ? this.conversationToPluginState(conv) : undefined;
+    };
+
+    serverCallbacks.findActiveConversation = (pluginName: string, userId: string) => {
+      const conv = chatConversationsRepository.findActiveByUserAndPlugin(pluginName, userId);
+      return conv ? this.conversationToPluginState(conv) : undefined;
+    };
+
+    serverCallbacks.updateConversationStatus = (id: string, status: string) => {
+      chatConversationsRepository.updateStatus(id, status as ConversationStatus);
+    };
+
+    serverCallbacks.createMessage = (data: {
+      conversationId: string;
+      direction: string;
+      content: string;
+      externalMessageId?: string;
+    }) => {
+      chatMessagesRepository.create({
+        conversationId: data.conversationId,
+        direction: data.direction as MessageDirection,
+        content: data.content,
+        externalMessageId: data.externalMessageId,
+      });
+    };
+
+    serverCallbacks.hasDuplicateAlert = (
+      pluginName: string,
+      userId: string,
+      alertType: string
+    ): boolean => {
+      return chatConversationsRepository.hasDuplicateActiveAlert(pluginName, userId, alertType);
+    };
+
+    // スケジューラーコールバック（循環依存を避けるため遅延import）
+    serverCallbacks.scheduleReminder = (conversationId: string, delayMs?: number) => {
+      import('../scheduler/chat-scheduler.js').then(({ getChatScheduler }) => {
+        getChatScheduler().scheduleNextReminder(conversationId, delayMs);
+      });
+    };
+
+    serverCallbacks.scheduleSnooze = (conversationId: string, durationMs: number) => {
+      import('../scheduler/chat-scheduler.js').then(({ getChatScheduler }) => {
+        getChatScheduler().scheduleSnooze(conversationId, durationMs);
+      });
+    };
+
+    // Agent取得コールバック
+    serverCallbacks.getAgent = () => {
+      return this.getCurrentAgent();
+    };
+
+    // AIチャットコールバック
+    serverCallbacks.chat = async (
+      agentSessionId: string | null,
+      message: string,
+      onChunk: (text: string) => void
+    ): Promise<{ newSessionId: string }> => {
+      const agent = this.getCurrentAgent();
+      if (!agent?.chat) {
+        throw new Error('No chat-capable agent available');
+      }
+
+      const activeInstructions = customInstructionsRepository.findActive();
+      const customInstructions = activeInstructions.map((i) => ({
+        instruction: i.instruction,
+        priority: i.priority,
+      }));
+
+      const chatParams: import('./interfaces/index.js').ChatParams = {
+        message,
+        history: [],
+        sessionId: agentSessionId ?? undefined,
+        customInstructions,
+      };
+
+      const generator = agent.chat(chatParams);
+      let result = await generator.next();
+
+      while (!result.done) {
+        onChunk(result.value);
+        result = await generator.next();
+      }
+
+      return { newSessionId: result.value?.sessionId || '' };
+    };
+  }
+
+  /**
+   * サーバーのConversationをプラグイン側の形式に変換
+   */
+  private conversationToPluginState(conv: Conversation) {
+    return {
+      id: conv.id,
+      externalUserId: conv.externalUserId,
+      alert: conv.originalPayload,
+      status: conv.status,
+      createdAt: conv.createdAt,
+    };
   }
 
   // ========== プラグイン一覧・取得 ==========

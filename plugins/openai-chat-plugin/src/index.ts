@@ -394,6 +394,7 @@ class OpenAIChatPlugin implements AgentPlugin {
         metrics: parsed.metrics || {},
         risks: parsed.risks || [],
         recommendations: parsed.recommendations || [],
+        alerts: parsed.alerts || [],
       };
     } catch {
       // パースに失敗した場合はフォールバック
@@ -402,6 +403,7 @@ class OpenAIChatPlugin implements AgentPlugin {
         metrics: {},
         risks: [],
         recommendations: [],
+        alerts: [],
       };
     }
   }

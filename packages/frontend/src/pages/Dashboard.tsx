@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useTimezone } from '../contexts/SettingsContext';
+import { getDatetimeRangeDaysAgo, dateTimeLocalToISO } from '../lib/date-utils';
 import { LineChart, type ChartDataPoint } from '../components/charts/LineChart';
 import { ReportCard } from '../components/ReportCard';
 import { TrendIndicator } from '../components/charts/TrendIndicator';
@@ -71,20 +72,19 @@ export function Dashboard(): ReactElement {
   });
 
   const { data: rangeData } = useQuery({
-    queryKey: ['health-data', 'range', DATA_TYPES],
+    queryKey: ['health-data', 'range', DATA_TYPES, timezone],
     queryFn: async () => {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
+      const { start, end } = getDatetimeRangeDaysAgo(7, timezone);
 
       const response = await api.healthData.list({
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
+        start_date: dateTimeLocalToISO(start, timezone),
+        end_date: dateTimeLocalToISO(end, timezone),
         limit: 1000,
       });
 
       return response.data;
     },
+    enabled: !!timezone,
   });
 
   const { data: latestReport } = useQuery({
@@ -131,7 +131,7 @@ export function Dashboard(): ReactElement {
       const { values } = dateMap.get(date)!;
       return {
         date,
-        weight: values.weight ?? 0,
+        body_weight: values.body_weight ?? 0,
         sleep_duration: values.sleep_duration ?? 0,
         steps: values.steps ?? 0,
       };

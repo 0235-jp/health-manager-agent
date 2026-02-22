@@ -124,7 +124,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const manifestPath = path.resolve(__dirname, '..', 'manifest.json');
 
 // Tools available for health data analysis
-const AVAILABLE_TOOLS = ['Bash', 'Skill', 'WebSearch', 'WebFetch'] as const;
+const AVAILABLE_TOOLS = ['Bash', 'Skill', 'WebSearch', 'WebFetch', 'Read'] as const;
+
+// Allowed paths for Read tool (health images data directory)
+const ALLOWED_READ_PATHS = ['/data/images/', '/data/'] as const;
 
 const REPORT_SCHEMA = {
   type: 'object',
@@ -144,8 +147,24 @@ const REPORT_SCHEMA = {
     },
     risks: { type: 'array', items: { type: 'string' } },
     recommendations: { type: 'array', items: { type: 'string' } },
+    alerts: {
+      type: 'array',
+      description: 'ユーザーに通知すべきアラート。運動不足、睡眠不良、異常値など即座にアクションが必要な場合に含める。',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '一意のアラートID（例: alert_low_steps_20260124）' },
+          type: { type: 'string', description: 'アラートタイプ（例: low_steps, poor_sleep, high_heart_rate）' },
+          message: { type: 'string', description: 'ユーザーへの通知メッセージ' },
+          priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+          actionRequired: { type: 'boolean', description: 'ユーザーのアクションが必要かどうか' },
+          verificationPrompt: { type: 'string', description: '対応後に検証するためのプロンプト' },
+        },
+        required: ['id', 'type', 'message', 'priority', 'actionRequired'],
+      },
+    },
   },
-  required: ['summary', 'metrics', 'risks', 'recommendations'],
+  required: ['summary', 'metrics', 'risks', 'recommendations', 'alerts'],
 } as const;
 
 /**
@@ -203,6 +222,25 @@ class ClaudeAgentPlugin implements AgentPlugin {
     // Skill, WebSearch, WebFetch は無条件許可
     if (toolName === 'Skill' || toolName === 'WebSearch' || toolName === 'WebFetch') {
       return { behavior: 'allow', updatedInput: input };
+    }
+
+    // Read ツール: データディレクトリ内のファイルのみ許可
+    if (toolName === 'Read') {
+      const filePath = input.file_path as string;
+      if (!filePath) {
+        return { behavior: 'deny', message: 'ファイルパスが指定されていません' };
+      }
+
+      // プロジェクトルートからの相対パスまたは絶対パスでデータディレクトリ内かチェック
+      const isInDataDir = ALLOWED_READ_PATHS.some(allowedPath =>
+        filePath.includes(allowedPath)
+      );
+
+      if (isInDataDir) {
+        return { behavior: 'allow', updatedInput: input };
+      }
+
+      return { behavior: 'deny', message: `このファイルへのアクセスは許可されていません: ${filePath}` };
     }
 
     if (toolName !== 'Bash') {
@@ -274,6 +312,7 @@ class ClaudeAgentPlugin implements AgentPlugin {
       metrics: {},
       risks: [],
       recommendations: [],
+      alerts: [],
     };
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "@health-manager/openai-chat-plugin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "OpenAI API Compatible Agent Plugin for Health Manager",
   "main": "dist/index.js",
   "type": "module",

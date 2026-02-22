@@ -25,8 +25,12 @@ export function DateTimePicker({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // value から Date オブジェクトを作成（表示用）
-  const selectedDate = value ? new Date(value) : undefined;
+  // value から日付部分を抽出（Date オブジェクトを経由しない）
+  const selectedDateStr = value ? value.split('T')[0] : '';
+
+  // カレンダー用の Date オブジェクト（表示位置の参照のみ）
+  // UTC として解釈させてブラウザのローカルタイムゾーンの影響を避ける
+  const selectedDate = selectedDateStr ? new Date(selectedDateStr + 'T00:00:00Z') : undefined;
 
   // value から時刻部分を抽出
   const timeValue = value ? value.split('T')[1] || '' : '';
@@ -55,9 +59,8 @@ export function DateTimePicker({
   // 時刻変更時
   function handleTimeChange(e: React.ChangeEvent<HTMLInputElement>) {
     const newTime = e.target.value;
-    if (selectedDate) {
-      const dateStr = formatDatePart(selectedDate);
-      onChange(`${dateStr}T${newTime}`);
+    if (selectedDateStr) {
+      onChange(`${selectedDateStr}T${newTime}`);
     } else {
       // 日付が未選択の場合は設定タイムゾーンでの今日の日付を使用
       const dateStr = getTodayDateString(timezone);
@@ -73,13 +76,12 @@ export function DateTimePicker({
     return `${year}-${month}-${day}`;
   }
 
-  // 表示用の日付フォーマット
-  function formatDisplayDate(date: Date): string {
-    return date.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  // 表示用の日付フォーマット（datetime-local 形式の文字列から直接生成）
+  function formatDisplayDate(dateStr: string): string {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月',
+                        '7月', '8月', '9月', '10月', '11月', '12月'];
+    return `${year}年${monthNames[month - 1]}${day}日`;
   }
 
   // タイムゾーンの短縮表示（都市名部分を抽出）
@@ -102,7 +104,7 @@ export function DateTimePicker({
           onClick={() => setIsCalendarOpen(!isCalendarOpen)}
           className="flex-1 px-3 py-2 text-left border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          {selectedDate ? formatDisplayDate(selectedDate) : '日付を選択'}
+          {selectedDateStr ? formatDisplayDate(selectedDateStr) : '日付を選択'}
         </button>
 
         {/* 時刻入力 */}

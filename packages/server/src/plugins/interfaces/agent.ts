@@ -78,7 +78,7 @@ export interface ReportContent {
   risks: string[];
   recommendations: string[];
   /** 通知すべきアラート */
-  alerts?: ReportAlert[];
+  alerts: ReportAlert[];
 }
 
 /**

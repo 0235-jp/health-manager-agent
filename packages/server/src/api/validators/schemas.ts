@@ -82,6 +82,23 @@ export const chatRequestSchema = z.object({
   session_id: z.string().nullish(),
 });
 
+// 健康診断画像用スキーマ
+export const healthImageQuerySchema = z.object({
+  start_date: z.string().datetime().optional(),
+  end_date: z.string().datetime().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
+
+export const healthImageUpdateSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  memo: z.string().max(2000).optional(),
+  recorded_at: z.string().datetime().optional(),
+});
+
+export type HealthImageQuery = z.infer<typeof healthImageQuerySchema>;
+export type HealthImageUpdate = z.infer<typeof healthImageUpdateSchema>;
+
 export type HealthDataQuery = z.infer<typeof healthDataQuerySchema>;
 export type HealthDataCreate = z.infer<typeof healthDataCreateSchema>;
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;

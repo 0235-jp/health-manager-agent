@@ -30,6 +30,10 @@ import {
   getHealthDataTimeseriesTool,
   executeGetHealthDataTimeseries,
 } from './builtin/get-health-data-timeseries.js';
+import {
+  getHealthImagesTool,
+  executeGetHealthImages,
+} from './builtin/get-health-images.js';
 
 export class DefaultToolExecutor implements ToolExecutor {
   private registry: ToolRegistry;
@@ -48,6 +52,7 @@ export class DefaultToolExecutor implements ToolExecutor {
     this.registry.register(getHealthDataLatestTool, executeGetHealthDataLatest);
     this.registry.register(getHealthDataTrendTool, executeGetHealthDataTrend);
     this.registry.register(getHealthDataTimeseriesTool, executeGetHealthDataTimeseries);
+    this.registry.register(getHealthImagesTool, executeGetHealthImages);
 
     console.log(
       `[ToolExecutor] Registered ${this.registry.size} built-in tools`

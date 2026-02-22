@@ -184,8 +184,10 @@ ${dataTypeCategoriesSection}
 レポートには以下を含めてください：
 - 全体的な健康状態のサマリー
 - 各指標の現在値とトレンド
+- 健康診断画像がある場合、その内容の分析結果
 - リスクや注意点
 - 改善のための推奨事項
+- ユーザーに即座に通知すべきアラート（運動不足、睡眠不良、異常値など）
 
 レポートは以下のJSON形式で出力してください：
 {
@@ -194,8 +196,23 @@ ${dataTypeCategoriesSection}
     "metric_name": { "value": 数値, "unit": "単位", "trend": "up|down|stable" }
   },
   "risks": ["リスク1", "リスク2"],
-  "recommendations": ["推奨事項1", "推奨事項2"]
-}`;
+  "recommendations": ["推奨事項1", "推奨事項2"],
+  "alerts": [
+    {
+      "id": "alert_タイプ_日付（例: alert_low_steps_20260124）",
+      "type": "アラートタイプ（例: low_steps, poor_sleep, high_heart_rate）",
+      "message": "ユーザーへの通知メッセージ（チャットで送信される）",
+      "priority": "high|medium|low",
+      "actionRequired": true,
+      "verificationPrompt": "対応後の検証プロンプト（オプション）"
+    }
+  ]
+}
+
+alertsフィールドについて：
+- ユーザーにチャットで即座に通知すべき内容がある場合に含めてください
+- 極端な運動不足、睡眠の質低下、バイタルの異常値など、アクションが必要な状況で使用してください
+- アラートがない場合は空配列 [] にしてください`;
 
     return basePrompt + this.formatCustomInstructions(params.customInstructions);
   }
@@ -227,6 +244,7 @@ ${dataTypeCategoriesSection}
 
     const basePrompt = `あなたは健康管理アシスタントです。
 ユーザーの健康データに基づいてアドバイスを提供します。
+健康診断画像も参照可能です。ユーザーが画像について質問した場合は画像データを取得して分析してください。
 
 ${dataAccessInstructions}
 
@@ -245,6 +263,7 @@ SERVER_BASE_URL: ${this.serverBaseUrl}
 ヘルスデータを取得するには、以下のスキルを使用してください：
 - get-health-data: 日次データの取得（期間指定、最新値、トレンド分析）
 - get-health-data-timeseries: 時系列データの取得（心拍数、HRV、睡眠フェーズなど高頻度データ）
+- get-health-images: 健康診断画像の取得（ファイルパスを取得して直接参照してください）
 
 データを取得する際は、必要に応じて日付範囲を指定してください。`;
   }

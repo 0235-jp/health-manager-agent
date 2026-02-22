@@ -31,3 +31,9 @@ export {
   executeGetHealthDataTimeseries,
   type GetHealthDataTimeseriesArgs,
 } from './get-health-data-timeseries.js';
+
+export {
+  getHealthImagesTool,
+  executeGetHealthImages,
+  type GetHealthImagesArgs,
+} from './get-health-images.js';

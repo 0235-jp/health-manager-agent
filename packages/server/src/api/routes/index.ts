@@ -11,6 +11,7 @@ import { schedulerRouter } from './scheduler.js';
 import { chatRouter } from './chat.js';
 import { webhooksRouter } from './webhooks.js';
 import { chatConversationsRouter } from './chat-conversations.js';
+import { healthImagesRouter } from './health-images.js';
 
 export const router = Router();
 
@@ -26,3 +27,4 @@ router.use('/scheduler', schedulerRouter);
 router.use('/chat', chatRouter);
 router.use('/webhooks', webhooksRouter);
 router.use('/chat/conversations', chatConversationsRouter);
+router.use('/health-images', healthImagesRouter);

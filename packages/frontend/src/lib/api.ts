@@ -20,6 +20,9 @@ import type {
   TimeseriesData,
   TimeseriesAggregateResult,
   ResampledPoint,
+  HealthImage,
+  HealthImageListParams,
+  HealthImageUpdateParams,
 } from '../types';
 
 const API_BASE = '/api';
@@ -309,6 +312,53 @@ export const api = {
 
     getDataTypes(): Promise<string[]> {
       return fetchJson('/health-data/timeseries/data-types');
+    },
+  },
+
+  healthImages: {
+    list(params: HealthImageListParams = {}): Promise<PaginatedResponse<HealthImage>> {
+      return fetchJson(`/health-images${buildQueryString(params)}`);
+    },
+
+    get(id: number): Promise<HealthImage> {
+      return fetchJson(`/health-images/${id}`);
+    },
+
+    getFileUrl(id: number): string {
+      return `${API_BASE}/health-images/${id}/file`;
+    },
+
+    async upload(params: { title: string; memo?: string; recorded_at: string; files: File[] }): Promise<{ data: HealthImage[] }> {
+      const formData = new FormData();
+      formData.append('title', params.title);
+      if (params.memo) formData.append('memo', params.memo);
+      formData.append('recorded_at', params.recorded_at);
+      for (const file of params.files) {
+        formData.append('files', file);
+      }
+
+      const response = await fetch(`${API_BASE}/health-images`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'Upload failed');
+      }
+
+      return response.json();
+    },
+
+    update(id: number, data: HealthImageUpdateParams): Promise<HealthImage> {
+      return fetchJson(`/health-images/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+
+    delete(id: number): Promise<void> {
+      return fetchJson(`/health-images/${id}`, { method: 'DELETE' });
     },
   },
 

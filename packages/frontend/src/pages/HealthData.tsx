@@ -10,8 +10,9 @@ import { useHeaderActions } from '../hooks/useHeaderActions';
 import type { HealthData as HealthDataType, PaginatedResponse, Plugin, DataType } from '../types';
 import { DataForm } from '../components/data/DataForm';
 import { LineChart, type ChartDataPoint } from '../components/charts/LineChart';
+import { ImageGallery } from '../components/data/ImageGallery';
 
-type TabType = 'list' | 'chart';
+type TabType = 'list' | 'chart' | 'images';
 
 const PAGE_SIZE = 20;
 
@@ -550,9 +551,21 @@ export function HealthData(): ReactElement {
         >
           グラフ
         </button>
+        <button
+          onClick={() => setActiveTab('images')}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'images'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          画像
+        </button>
       </div>
 
-      {activeTab === 'list' ? (
+      {activeTab === 'images' ? (
+        <ImageGallery />
+      ) : activeTab === 'list' ? (
         <>
           <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap gap-4">
