@@ -12,18 +12,29 @@ Health Manager MCP サーバーへの接続を確認し、未設定の場合は�
 
 ### 1. 環境変数の確認
 
-Bash で `echo $HEALTH_MANAGER_URL` を実行し、現在の設定値を確認してください。
+Bash で以下を実行し、現在の設定値を確認してください:
+
+```
+echo "URL: ${HEALTH_MANAGER_URL:-http://localhost:3001}"
+echo "CF_ACCESS_CLIENT_ID: ${CF_ACCESS_CLIENT_ID:-(未設定)}"
+```
+
 未設定の場合、デフォルトの `http://localhost:3001` が使用されます。
 
 ### 2. ヘルスチェック
 
-接続先 URL（`$HEALTH_MANAGER_URL` またはデフォルト `http://localhost:3001`）に対して、Bash で以下を実行してください:
+接続先 URL に対してヘルスチェックを実行してください。Cloudflare Access で保護されている場合は CF Access ヘッダーが必要です。
+
+**CF Access ヘッダーが設定されている場合:**
 
 ```
-curl -s \
-  ${CF_ACCESS_CLIENT_ID:+-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"} \
-  ${CF_ACCESS_CLIENT_SECRET:+-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"} \
-  "${HEALTH_MANAGER_URL:-http://localhost:3001}/health"
+curl -s -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" "${HEALTH_MANAGER_URL:-http://localhost:3001}/health"
+```
+
+**ローカル環境の場合:**
+
+```
+curl -s "${HEALTH_MANAGER_URL:-http://localhost:3001}/health"
 ```
 
 ### 3. 結果に応じた対応
@@ -71,11 +82,7 @@ export HEALTH_MANAGER_BEARER_TOKEN=your-token-here
 認証付きでの接続確認:
 
 ```
-curl -s \
-  -H "Authorization: Bearer $HEALTH_MANAGER_BEARER_TOKEN" \
-  ${CF_ACCESS_CLIENT_ID:+-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"} \
-  ${CF_ACCESS_CLIENT_SECRET:+-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"} \
-  "${HEALTH_MANAGER_URL:-http://localhost:3001}/api/health-data/types"
+curl -s -H "Authorization: Bearer $HEALTH_MANAGER_BEARER_TOKEN" -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" "${HEALTH_MANAGER_URL:-http://localhost:3001}/api/health-data/types"
 ```
 
 ### Cloudflare Access 認証
