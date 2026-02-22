@@ -20,7 +20,10 @@ Bash で `echo $HEALTH_MANAGER_URL` を実行し、現在の設定値を確認�
 接続先 URL（`$HEALTH_MANAGER_URL` またはデフォルト `http://localhost:3001`）に対して、Bash で以下を実行してください:
 
 ```
-curl -s "${HEALTH_MANAGER_URL:-http://localhost:3001}/health"
+curl -s \
+  ${CF_ACCESS_CLIENT_ID:+-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"} \
+  ${CF_ACCESS_CLIENT_SECRET:+-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"} \
+  "${HEALTH_MANAGER_URL:-http://localhost:3001}/health"
 ```
 
 ### 3. 結果に応じた対応
@@ -68,7 +71,11 @@ export HEALTH_MANAGER_BEARER_TOKEN=your-token-here
 認証付きでの接続確認:
 
 ```
-curl -s -H "Authorization: Bearer $HEALTH_MANAGER_BEARER_TOKEN" "${HEALTH_MANAGER_URL:-http://localhost:3001}/api/health-data/types"
+curl -s \
+  -H "Authorization: Bearer $HEALTH_MANAGER_BEARER_TOKEN" \
+  ${CF_ACCESS_CLIENT_ID:+-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"} \
+  ${CF_ACCESS_CLIENT_SECRET:+-H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"} \
+  "${HEALTH_MANAGER_URL:-http://localhost:3001}/api/health-data/types"
 ```
 
 ### Cloudflare Access 認証
@@ -80,4 +87,4 @@ export CF_ACCESS_CLIENT_ID=your-client-id
 export CF_ACCESS_CLIENT_SECRET=your-client-secret
 ```
 
-Cloudflare Access 経由の場合、Cloudflare プロキシが自動的に認証ヘッダーを付与するため、プラグイン側での追加設定は不要です。
+これにより、MCP プラグインと curl コマンドが自動的に `CF-Access-Client-Id` / `CF-Access-Client-Secret` ヘッダーを付与し、Cloudflare Access のエッジ認証を通過します。
