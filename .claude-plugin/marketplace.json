@@ -1,0 +1,14 @@
+{
+  "name": "health-manager-plugins",
+  "owner": { "name": "Health Manager" },
+  "metadata": {
+    "description": "Health Manager Agent の MCP 連携プラグイン"
+  },
+  "plugins": [
+    {
+      "name": "health-manager-mcp",
+      "source": "./claude-code-plugin",
+      "description": "Health Manager の MCP サーバーに接続し、健康データを Claude Code から直接参照"
+    }
+  ]
+}
